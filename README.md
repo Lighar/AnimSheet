@@ -8,7 +8,7 @@
 
 **SpriteSheet Source:** [Snoblin's Pixel RPG Free NPC](https://snoblin.itch.io/pixel-rpg-free-npc)
 
-Say goodbye to the hassle of manually setting up Animation Player ! AnimSheet lets you **effortlessly create `Sprite2D` and `AnimationPlayer` nodes** directly from your sprite sheets. Just **load**, **define**, and **generate animation** – it's that easy! 🚀
+Say goodbye to the hassle of manually setting up Animation Player ! AnimSheet lets you **effortlessly create `Sprite2D` and `AnimationPlayer` or one `AnimatedSprite2D` nodes** directly from your sprite sheets. Just **load**, **define**, and **generate animation** – it's that easy! 🚀
 
 ---
 

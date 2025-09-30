@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3 uid="uid://dni6a81cgtkg2"]
+[gd_scene load_steps=2 format=3 uid="uid://r25mhx1jk0i0"]
 
-[ext_resource type="Script" uid="uid://ce2qet23ckgri" path="res://addons/anim_sheet/sprite_sheet_animator.gd" id="1_mseq5"]
+[ext_resource type="Script" uid="uid://dkcy3rgktprrv" path="res://addons/anim_sheet/sprite_sheet_animator.gd" id="1_i02eu"]
 
 [node name="SpriteSheetAnimatorPanel" type="Control"]
 layout_mode = 3
@@ -9,7 +9,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_mseq5")
+script = ExtResource("1_i02eu")
 
 [node name="HSplitContainer" type="HSplitContainer" parent="."]
 layout_mode = 0
@@ -17,7 +17,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 
 [node name="PanelContainer" type="PanelContainer" parent="HSplitContainer"]
-custom_minimum_size = Vector2(250, 0)
+custom_minimum_size = Vector2(280, 0)
 layout_mode = 2
 size_flags_vertical = 3
 
@@ -106,6 +106,27 @@ text = "Clear All Outlines"
 [node name="HSeparator5" type="HSeparator" parent="HSplitContainer/PanelContainer/VBoxContainer"]
 layout_mode = 2
 
+[node name="Label5" type="Label" parent="HSplitContainer/PanelContainer/VBoxContainer"]
+layout_mode = 2
+text = "Output Format:"
+
+[node name="OutputFormatContainer" type="HBoxContainer" parent="HSplitContainer/PanelContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="OutputFormatOption" type="OptionButton" parent="HSplitContainer/PanelContainer/VBoxContainer/OutputFormatContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Choose output format for generated animations"
+selected = 0
+item_count = 2
+popup/item_0/text = "AnimationPlayer"
+popup/item_0/id = 0
+popup/item_1/text = "AnimatedSprite2D"
+popup/item_1/id = 1
+
+[node name="HSeparator6" type="HSeparator" parent="HSplitContainer/PanelContainer/VBoxContainer"]
+layout_mode = 2
+
 [node name="Label6" type="Label" parent="HSplitContainer/PanelContainer/VBoxContainer"]
 layout_mode = 2
 text = "Animation FPS:"
@@ -120,11 +141,12 @@ value = 10.0
 layout_mode = 2
 tooltip_text = "Load a sprite sheet first."
 disabled = true
-text = "Generate AnimationPlayer"
+text = "Generate Animation"
 
 [node name="StatusLabel" type="Label" parent="HSplitContainer/PanelContainer/VBoxContainer"]
 layout_mode = 2
 text = "Status: Ready. Load a sprite sheet."
+autowrap_mode = 3
 
 [node name="PanelContainer2" type="PanelContainer" parent="HSplitContainer"]
 layout_mode = 2

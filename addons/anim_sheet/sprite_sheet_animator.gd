@@ -10,23 +10,26 @@ extends Control
 @onready var auto_detect_button = $HSplitContainer/PanelContainer/VBoxContainer/AutoDetectButton
 @onready var clear_button = $HSplitContainer/PanelContainer/VBoxContainer/ClearButton
 @onready var fps_spinbox = $HSplitContainer/PanelContainer/VBoxContainer/FpsSpinBox
+# New UI elements for output format selection
+@onready var output_format_option = $HSplitContainer/PanelContainer/VBoxContainer/OutputFormatContainer/OutputFormatOption
 @onready var generate_button = $HSplitContainer/PanelContainer/VBoxContainer/GenerateButton
 @onready var status_label = $HSplitContainer/PanelContainer/VBoxContainer/StatusLabel
 @onready var texture_display = $HSplitContainer/PanelContainer2/TextureDisplay
 
 # --- Plugin State ---
 var sprite_sheet_texture: Texture2D = null
-var sprite_sheet_image: Image = null 
+var sprite_sheet_image: Image = null
 var sprite_width: int = 32
 var sprite_height: int = 32
 var sheet_direction: int = 0 # 0: Horizontal, 1: Vertical
 var frames_per_animation: int = 0 # 0 = full row/col
+var output_format: int = 0 # 0: AnimationPlayer, 1: AnimatedSprite2D
 
 var animations: Array[Dictionary] = [] # {"name": String, "rect": Rect2, "frames": Array[Vector2i], "color": Color}
 var colors: Array[Color] = [
-	Color.RED, Color.GREEN, Color.BLUE, Color.YELLOW, Color.PURPLE,
-	Color.ORANGE, Color.CYAN, Color.MAGENTA, Color.LIME
-]
+									Color.RED, Color.GREEN, Color.BLUE, Color.YELLOW, Color.PURPLE,
+									Color.ORANGE, Color.CYAN, Color.MAGENTA, Color.LIME
+									]
 var next_color_index: int = 0
 var next_anim_index: int = 1
 
@@ -46,6 +49,7 @@ func _ready():
 	sprite_height_spinbox.value_changed.connect(_on_parameter_changed)
 	direction_option_button.item_selected.connect(_on_parameter_changed)
 	frames_per_anim_spinbox.value_changed.connect(_on_parameter_changed)
+	output_format_option.item_selected.connect(_on_output_format_changed)
 	auto_detect_button.pressed.connect(_on_auto_detect_pressed)
 	clear_button.pressed.connect(_on_clear_pressed)
 	generate_button.pressed.connect(_on_generate_pressed)
@@ -77,6 +81,7 @@ func update_status(text: String):
 func update_generate_button_state():
 	var can_generate = sprite_sheet_texture != null and not animations.is_empty()
 	generate_button.disabled = not can_generate
+
 	if generate_button.disabled:
 		if sprite_sheet_texture == null:
 			generate_button.tooltip_text = "Load a sprite sheet first."
@@ -85,7 +90,8 @@ func update_generate_button_state():
 		else:
 			generate_button.tooltip_text = ""
 	else:
-		generate_button.tooltip_text = "Generate a new Sprite2D + AnimationPlayer in the current scene."
+		var format_text = "AnimationPlayer" if output_format == 0 else "AnimatedSprite2D"
+		generate_button.tooltip_text = "Generate a new Sprite2D + %s in the current scene." % format_text
 
 
 # --- Signal Handlers ---
@@ -106,12 +112,12 @@ func _on_file_selected(path: String):
 				if err != OK:
 					update_status("Warning: Error decompressing image. Transparency check might fail.")
 			#check if alpha channel is present
-			if sprite_sheet_image.get_format() < Image.FORMAT_LA8: 
+			if sprite_sheet_image.get_format() < Image.FORMAT_LA8:
 				sprite_sheet_image.convert(Image.FORMAT_RGBA8)
 
-		clear_animations() 
+		clear_animations()
 		update_status("Sprite sheet loaded: " + path.get_file())
-		_on_parameter_changed() 
+		_on_parameter_changed()
 		texture_display.queue_redraw()
 	else:
 		update_status("Error: Selected file is not a valid Texture2D.")
@@ -126,7 +132,13 @@ func _on_parameter_changed(value = null):
 	sprite_height = max(1, int(sprite_height_spinbox.value))
 	sheet_direction = direction_option_button.selected
 	frames_per_animation = max(0, int(frames_per_anim_spinbox.value))
-	texture_display.queue_redraw() 
+	texture_display.queue_redraw()
+
+func _on_output_format_changed(index: int):
+	output_format = index
+	update_generate_button_state()
+	var format_text = "AnimationPlayer" if output_format == 0 else "AnimatedSprite2D"
+	update_status("Output format changed to: " + format_text)
 
 func _on_auto_detect_pressed():
 	if not sprite_sheet_texture:
@@ -156,7 +168,8 @@ func _on_auto_detect_pressed():
 	var anim_index = 0
 	var last_line_had_content = false
 
-	if sheet_direction == 0: 		for r in range(rows):
+	if sheet_direction == 0: # Horizontal
+		for r in range(rows):
 			var current_anim_frames: Array[Vector2i] = []
 			var start_col = -1
 			var current_frame_count = 0
@@ -192,7 +205,8 @@ func _on_auto_detect_pressed():
 			elif not line_has_content:
 				last_line_had_content = false
 
-	else: 		for c in range(cols):
+	else: # Vertical
+		for c in range(cols):
 			var current_anim_frames: Array[Vector2i] = []
 			var start_row = -1
 			var current_frame_count = 0
@@ -274,6 +288,12 @@ func _on_generate_pressed():
 		update_status("Error: Cannot find the edited scene root. Open a scene first.")
 		return
 
+	if output_format == 0:
+		generate_animation_player_format()
+	else:
+		generate_animated_sprite_format()
+
+func generate_animation_player_format():
 	# --- Calculate Frame Data ---
 	var tex_w = sprite_sheet_texture.get_width()
 	var tex_h = sprite_sheet_texture.get_height()
@@ -290,6 +310,8 @@ func _on_generate_pressed():
 	if hframes * sprite_width != tex_w or vframes * sprite_height != tex_h:
 		update_status("Warning: Texture dimensions are not exact multiples of sprite size. Frame calculation might be inaccurate.")
 
+	var scene_root = EditorInterface.get_edited_scene_root()
+
 	# --- Create and Configure New Sprite2D ---
 	var new_sprite = Sprite2D.new()
 	new_sprite.name = sprite_sheet_texture.resource_path.get_file().get_basename() + "Sprite"
@@ -304,12 +326,11 @@ func _on_generate_pressed():
 	anim_player.name = new_sprite.name + "AnimationPlayer"
 
 	# --- Add Nodes to Scene ---
-	# We need to set owner to make it persistent in the scene
 	scene_root.add_child(new_sprite)
-	new_sprite.owner = scene_root 
+	new_sprite.owner = scene_root
 
 	new_sprite.add_child(anim_player)
-	anim_player.owner = scene_root 
+	anim_player.owner = scene_root
 
 	update_status("Created new Sprite2D: '%s'" % new_sprite.name)
 
@@ -330,11 +351,9 @@ func _on_generate_pressed():
 		anim.length = frame_coords_array.size() * frame_duration
 
 		var track_idx = anim.add_track(Animation.TYPE_VALUE)
-		# Path from AnimationPlayer to its parent Sprite2D is "."
 		var path_to_sprite = NodePath(".")
 		anim.track_set_path(track_idx, str(path_to_sprite) + ":frame_coords")
-		#set update mode to discrete for spritesheet
-		anim.value_track_set_update_mode(track_idx, Animation.UPDATE_DISCRETE) 
+		anim.value_track_set_update_mode(track_idx, Animation.UPDATE_DISCRETE)
 
 		# Insert keyframes
 		for i in range(frame_coords_array.size()):
@@ -344,9 +363,6 @@ func _on_generate_pressed():
 
 		var anim_name = anim_data["name"]
 		if anim_library.has_animation(anim_name):
-			# Handle name collision
-			# As names are unique in editor, it should not happen in normal cases
-			# But we will handle it just in case
 			var count = 2
 			var base_name = anim_name
 			while anim_library.has_animation(anim_name):
@@ -355,13 +371,72 @@ func _on_generate_pressed():
 			update_status("Warning: Duplicate animation name '%s' found, renamed to %s" % [base_name, anim_name])
 
 		anim_library.add_animation(anim_name, anim)
-	# "" for the default library
-	anim_player.add_animation_library("", anim_library) 
+
+	anim_player.add_animation_library("", anim_library)
 
 	update_status("AnimationPlayer generated successfully for '%s'!" % new_sprite.name)
-	
-	# Select the new sprite
-	EditorInterface.edit_node(new_sprite) 
+	EditorInterface.edit_node(new_sprite)
+
+func generate_animated_sprite_format():
+	var scene_root = EditorInterface.get_edited_scene_root()
+
+	# --- Create AnimatedSprite2D ---
+	var animated_sprite = AnimatedSprite2D.new()
+	animated_sprite.name = sprite_sheet_texture.resource_path.get_file().get_basename() + "AnimatedSprite"
+
+	# --- Create SpriteFrames ---
+	var sprite_frames = SpriteFrames.new()
+	var fps = float(fps_spinbox.value)
+
+	# --- Calculate frame dimensions ---
+	var tex_w = sprite_sheet_texture.get_width()
+	var tex_h = sprite_sheet_texture.get_height()
+	var frame_width = sprite_width
+	var frame_height = sprite_height
+
+	# --- Process each animation ---
+	for anim_data in animations:
+		var anim_name: String = anim_data["name"]
+		var frame_coords_array: Array = anim_data["frames"]
+
+		if frame_coords_array.is_empty():
+			continue
+
+		# Add animation to SpriteFrames
+		sprite_frames.add_animation(anim_name)
+		sprite_frames.set_animation_speed(anim_name, fps)
+		sprite_frames.set_animation_loop(anim_name, true)
+
+		# Create frames for this animation
+		for frame_coord in frame_coords_array:
+			var coord = frame_coord as Vector2i
+
+			# Create AtlasTexture for each frame
+			var atlas_texture = AtlasTexture.new()
+			atlas_texture.atlas = sprite_sheet_texture
+			atlas_texture.region = Rect2(
+				coord.x * frame_width,
+				coord.y * frame_height,
+				frame_width,
+				frame_height
+			)
+
+			sprite_frames.add_frame(anim_name, atlas_texture)
+
+	# --- Configure AnimatedSprite2D ---
+	animated_sprite.sprite_frames = sprite_frames
+
+	# Set first animation as current if available
+	var anim_names = sprite_frames.get_animation_names()
+	if not anim_names.is_empty():
+		animated_sprite.animation = anim_names[0]
+
+	# --- Add to scene ---
+	scene_root.add_child(animated_sprite)
+	animated_sprite.owner = scene_root
+
+	update_status("AnimatedSprite2D generated successfully: '%s'!" % animated_sprite.name)
+	EditorInterface.edit_node(animated_sprite)
 
 # --- Drawing and Interaction ---
 func _on_texture_display_draw():
@@ -393,9 +468,7 @@ func _on_texture_display_draw():
 		var label_pos = get_label_pos(rect, font_size)
 		var label_rect = get_label_rect(name, rect, font, font_size)
 		texture_display.draw_string(font, label_pos, name, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
-		# Draw dragging rectangle if active
-		#texture_display.draw_rect(label_rect, color, true, 1.0)
-	
+
 	if dragging:
 		var drag_rect = Rect2(drag_start_pos, drag_current_pos - drag_start_pos).abs()
 		texture_display.draw_rect(drag_rect, Color.WHITE, false, 1.0)
@@ -445,8 +518,8 @@ func _on_texture_display_gui_input(event: InputEvent):
 					texture_display.queue_redraw()
 					accept_event()
 
-			# Button released after dragging
-			elif dragging: 
+				# Button released after dragging
+			elif dragging:
 				dragging = false
 				var drag_end_pos = mouse_pos
 				var final_rect = Rect2(drag_start_pos, drag_end_pos - drag_start_pos).abs()
@@ -457,7 +530,7 @@ func _on_texture_display_gui_input(event: InputEvent):
 		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 			# Delete animation region on right click
 			var deleted = false
-			for i in range(animations.size() - 1, -1, -1): 
+			for i in range(animations.size() - 1, -1, -1):
 				var anim_data = animations[i]
 				var rect: Rect2 = anim_data["rect"]
 				if rect.grow(2.0).has_point(mouse_pos):
@@ -470,7 +543,7 @@ func _on_texture_display_gui_input(event: InputEvent):
 					accept_event()
 					break
 			if deleted:
-				find_next_name_number() 
+				find_next_name_number()
 
 	elif event is InputEventMouseMotion and dragging:
 		drag_current_pos = texture_display.get_local_mouse_position()
@@ -541,25 +614,25 @@ func add_animation_definition(start_col: int, start_row: int, end_col: int, end_
 
 	# Generate unique default name
 	var base_name = "Anim"
-	var anim_name = base_name + str(next_anim_index)
+	var anim_name = base_name + str(next_anim_index).pad_zeros(3)
 	var name_exists = true
 	while name_exists:
 		name_exists = false
 		for existing_anim in animations:
 			if existing_anim["name"] == anim_name:
 				next_anim_index += 1
-				anim_name = base_name + str(next_anim_index)
+				anim_name = base_name + str(next_anim_index).pad_zeros(3)
 				name_exists = true
 				break
 	next_anim_index += 1 # Increment for the *next* animation
 
 	# Calculate pixel rectangle for drawing
 	var anim_rect = Rect2(
-		start_col * sprite_width,
-		start_row * sprite_height,
-		(end_col - start_col + 1) * sprite_width,
-		(end_row - start_row + 1) * sprite_height
-	)
+						start_col * sprite_width,
+						start_row * sprite_height,
+						(end_col - start_col + 1) * sprite_width,
+						(end_row - start_row + 1) * sprite_height
+					)
 
 	# Assign next color
 	var anim_color = colors[next_color_index % colors.size()]
@@ -625,7 +698,7 @@ func _on_rename_confirmed(popup: ConfirmationDialog, line_edit: LineEdit, index:
 				add_child(err_dialog)
 				err_dialog.popup_centered()
 				err_dialog.connect("popup_hide", Callable(err_dialog, "queue_free"), CONNECT_ONE_SHOT)
-				line_edit.grab_focus() 
+				line_edit.grab_focus()
 			else:
 				animations[index]["name"] = new_name
 				update_status("Renamed animation to '%s'." % new_name)
@@ -633,7 +706,7 @@ func _on_rename_confirmed(popup: ConfirmationDialog, line_edit: LineEdit, index:
 				renaming_anim_index = -1
 		else:
 			update_status("Error: Animation name cannot be empty.")
-			line_edit.grab_focus() 
+			line_edit.grab_focus()
 	else:
 		update_status("Error: Could not rename animation (invalid index).")
 		renaming_anim_index = -1
