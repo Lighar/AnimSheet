@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://cftsqe15cvpqx"]
+
+[ext_resource type="Script" uid="uid://ctqtbr7tc0vf" path="res://addons/tiled_image_scanner/components/animated_preview.gd" id="1_w7r3h"]
+
+[node name="AnimatedPreview" type="Control" unique_id=2001227308]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 200.0
+offset_bottom = 200.0
+script = ExtResource("1_w7r3h")
+
+[node name="TextureRect" type="TextureRect" parent="." unique_id=2081336117]
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 5

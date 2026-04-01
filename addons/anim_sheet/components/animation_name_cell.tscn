@@ -1,0 +1,16 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://addons/tiled_image_scanner/components/animation_name_cell.gd" id="1_cell"]
+[ext_resource type="PackedScene" path="res://addons/tiled_image_scanner/components/animated_preview.tscn" id="2_preview"]
+
+[node name="AnimationNameCell" type="VBoxContainer"]
+custom_minimum_size = Vector2(200, 250)
+script = ExtResource("1_cell")
+
+[node name="AnimatedPreview" parent="." instance=ExtResource("2_preview")]
+custom_minimum_size = Vector2(200, 200)
+layout_mode = 2
+
+[node name="NameInput" type="LineEdit" parent="."]
+layout_mode = 2
+placeholder_text = "Animation name"

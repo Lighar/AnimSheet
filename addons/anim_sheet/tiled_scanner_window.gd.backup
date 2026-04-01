@@ -1,0 +1,913 @@
+@tool
+extends Control
+
+@onready var select_zip_button: Button = %SelectZipButton
+@onready var select_folder_button: Button = %SelectFolderButton
+@onready var tree: Tree = %Tree
+@onready var info_panel: VBoxContainer = %InfoPanel
+@onready var status_label: Label = %StatusLabel
+@onready var fps_spinbox: SpinBox = %FPSSpinBox
+@onready var direction_option: OptionButton = %DirectionOption
+@onready var validate_button: Button = %ValidateButton
+
+# Animation naming view
+@onready var scan_view: Control = %ScanView
+@onready var naming_view: Control = %NamingView
+@onready var node_name_edit: LineEdit = %NodeNameEdit
+@onready var animations_grid: GridContainer = %AnimationsGrid
+@onready var back_button: Button = %BackButton
+@onready var export_anim_player_button: Button = %ExportAnimPlayerButton
+@onready var export_animated_sprite_button: Button = %ExportAnimatedSpriteButton
+
+var current_zip_path: String = ""
+var extracted_path: String = ""
+var scanned_images: Array[Dictionary] = []
+var tree_items: Dictionary = {}
+var folder_items: Dictionary = {}
+var current_preview_widget = null  # Current preview in info panel
+var current_animation_index: int = 0
+var current_selected_image: Dictionary = {}
+var animation_name_inputs: Dictionary = {}  # Maps original anim name to LineEdit
+var animation_previews: Array = []  # Store all preview instances
+var preview_timer: Timer = null  # Shared timer for all previews
+var info_panel_timer: Timer = null  # Timer for info panel preview
+
+func _ready() -> void:
+	select_zip_button.pressed.connect(_on_select_zip_pressed)
+	select_folder_button.pressed.connect(_on_select_folder_pressed)
+	validate_button.pressed.connect(_on_validate_pressed)
+	back_button.pressed.connect(_on_back_pressed)
+	export_anim_player_button.pressed.connect(_on_export_anim_player_pressed)
+	export_animated_sprite_button.pressed.connect(_on_export_animated_sprite_pressed)
+	tree.item_selected.connect(_on_tree_item_selected)
+	tree.item_edited.connect(_on_tree_item_edited)
+	
+	validate_button.disabled = true
+	export_anim_player_button.disabled = true
+	export_animated_sprite_button.disabled = true
+	
+	# Start with scan view visible
+	scan_view.visible = true
+	naming_view.visible = false
+	
+	fps_spinbox.min_value = 1
+	fps_spinbox.max_value = 60
+	fps_spinbox.value = 10
+	fps_spinbox.step = 1
+	fps_spinbox.value_changed.connect(_on_animation_settings_changed)
+	
+	direction_option.clear()
+	direction_option.add_item("Horizontal (Row-based)", 0)
+	direction_option.add_item("Vertical (Column-based)", 1)
+	direction_option.selected = 0
+	direction_option.item_selected.connect(_on_animation_settings_changed)
+	
+	_setup_tree()
+	_clear_info_panel()
+
+func _on_animation_settings_changed(_value = null) -> void:
+	# Refresh the current preview if an image is selected
+	var selected := tree.get_selected()
+	if selected:
+		var metadata = selected.get_metadata(0)
+		if metadata is Dictionary and not metadata.has("type"):
+			_display_info(metadata)
+
+func _setup_tree() -> void:
+	tree.clear()
+	tree.set_column_titles_visible(true)
+	tree.set_columns(2)
+	tree.set_column_title(0, "Folder / Image Files")
+	tree.set_column_title(1, "Select")
+	tree.set_column_expand(0, true)
+	tree.set_column_expand(1, false)
+	tree.set_column_custom_minimum_width(1, 60)
+	tree.create_item()
+	tree.hide_root = true
+
+func _on_select_zip_pressed() -> void:
+	var file_dialog := EditorFileDialog.new()
+	file_dialog.file_mode = EditorFileDialog.FILE_MODE_OPEN_FILE
+	file_dialog.access = EditorFileDialog.ACCESS_FILESYSTEM
+	file_dialog.add_filter("*.zip", "ZIP Archives")
+	file_dialog.file_selected.connect(_on_zip_selected)
+	add_child(file_dialog)
+	file_dialog.popup_centered_ratio(0.6)
+
+func _on_select_folder_pressed() -> void:
+	var file_dialog := EditorFileDialog.new()
+	file_dialog.file_mode = EditorFileDialog.FILE_MODE_OPEN_DIR
+	file_dialog.access = EditorFileDialog.ACCESS_FILESYSTEM
+	file_dialog.dir_selected.connect(_on_folder_selected)
+	add_child(file_dialog)
+	file_dialog.popup_centered_ratio(0.6)
+
+func _on_zip_selected(path: String) -> void:
+	current_zip_path = path
+	status_label.text = "Selected: " + path.get_file() + " - Scanning..."
+	await get_tree().process_frame
+	_extract_and_scan()
+
+func _on_folder_selected(path: String) -> void:
+	extracted_path = path
+	status_label.text = "Selected folder: " + path.get_file() + " - Scanning..."
+	await get_tree().process_frame
+	_scan_images()
+
+func _extract_and_scan() -> void:
+	extracted_path = "user://temp_extract_" + str(Time.get_ticks_msec())
+	DirAccess.make_dir_absolute(extracted_path)
+	
+	var reader := ZIPReader.new()
+	var err := reader.open(current_zip_path)
+	if err != OK:
+		status_label.text = "Error: Failed to open ZIP file"
+		return
+	
+	var files := reader.get_files()
+	for file_path in files:
+		var file_data := reader.read_file(file_path)
+		if file_data.size() == 0:
+			continue
+		
+		var full_path := extracted_path.path_join(file_path)
+		var dir_path := full_path.get_base_dir()
+		DirAccess.make_dir_recursive_absolute(dir_path)
+		
+		var file := FileAccess.open(full_path, FileAccess.WRITE)
+		if file:
+			file.store_buffer(file_data)
+			file.close()
+	
+	reader.close()
+	
+	_scan_images()
+
+func _scan_images() -> void:
+	scanned_images.clear()
+	var image_files := _find_image_files(extracted_path)
+	
+	status_label.text = "Found %d images, analyzing..." % image_files.size()
+	await get_tree().process_frame
+	
+	var tiled_count := 0
+	for img_path in image_files:
+		var result := _analyze_image(img_path)
+		if result.has("cell_width"):
+			scanned_images.append(result)
+			tiled_count += 1
+	
+	_populate_tree()
+	
+	if tiled_count > 0:
+		status_label.text = "Found %d tiled images out of %d total" % [tiled_count, image_files.size()]
+		_update_export_buttons_state()
+	else:
+		status_label.text = "No tiled images found"
+
+func _find_image_files(dir_path: String) -> Array[String]:
+	var result: Array[String] = []
+	var dir := DirAccess.open(dir_path)
+	
+	if not dir:
+		return result
+	
+	dir.list_dir_begin()
+	var file_name := dir.get_next()
+	
+	while file_name != "":
+		var full_path := dir_path.path_join(file_name)
+		
+		if dir.current_is_dir():
+			if file_name != "." and file_name != "..":
+				result.append_array(_find_image_files(full_path))
+		else:
+			var ext := file_name.get_extension().to_lower()
+			if ext in ["png", "jpg", "jpeg"]:
+				result.append(full_path)
+		
+		file_name = dir.get_next()
+	
+	dir.list_dir_end()
+	return result
+
+func _analyze_image(img_path: String) -> Dictionary:
+	var img := Image.new()
+	var err := img.load(img_path)
+	
+	if err != OK:
+		return {}
+	
+	var grid_info := GridDetectorUtils.detect(img)
+	
+	if grid_info.is_empty():
+		return {}
+	
+	var result := {
+		"path": img_path,
+		"filename": img_path.get_file(),
+		"width": img.get_width(),
+		"height": img.get_height(),
+		"cell_width": grid_info.get("cell_width", 0),
+		"cell_height": grid_info.get("cell_height", 0),
+		"offset_x": grid_info.get("offset_x", 0),
+		"offset_y": grid_info.get("offset_y", 0),
+		"selected": false
+	}
+	
+	if result.cell_width > 0:
+		result.columns = int(result.width / result.cell_width)
+	else:
+		result.columns = 1
+	
+	if result.cell_height > 0:
+		result.rows = int(result.height / result.cell_height)
+	else:
+		result.rows = 1
+	
+	result.total_tiles = result.columns * result.rows
+	
+	return result
+
+func _populate_tree() -> void:
+	tree.clear()
+	tree_items.clear()
+	folder_items.clear()
+	var root := tree.create_item()
+	
+	# Build folder structure
+	var folder_structure := _build_folder_structure()
+	
+	# Create tree items recursively
+	for folder_path in folder_structure.keys():
+		if folder_path == "":
+			continue
+		_create_folder_tree_item(root, folder_path, folder_structure)
+	
+	# Add root-level images (if any)
+	for img_data in scanned_images:
+		var rel_path := _get_relative_path(img_data.path)
+		if "/" not in rel_path:
+			_create_image_tree_item(root, img_data)
+
+func _build_folder_structure() -> Dictionary:
+	var structure := {}
+	
+	for img_data in scanned_images:
+		var rel_path := _get_relative_path(img_data.path)
+		var dir_path := rel_path.get_base_dir()
+		
+		if dir_path != "" and dir_path != ".":
+			var parts := dir_path.split("/")
+			var current_path := ""
+			
+			for part in parts:
+				var parent_path := current_path
+				current_path = current_path.path_join(part) if current_path != "" else part
+				
+				if not structure.has(current_path):
+					structure[current_path] = {
+						"parent": parent_path,
+						"name": part,
+						"images": [],
+						"children": []
+					}
+				
+				if parent_path != "" and parent_path in structure:
+					if current_path not in structure[parent_path].children:
+						structure[parent_path].children.append(current_path)
+			
+			structure[dir_path].images.append(img_data)
+	
+	return structure
+
+func _create_folder_tree_item(parent: TreeItem, folder_path: String, structure: Dictionary) -> TreeItem:
+	if folder_items.has(folder_path):
+		return folder_items[folder_path]
+	
+	var folder_data = structure[folder_path]
+	var parent_path: String = folder_data.parent
+	
+	var actual_parent := parent
+	if parent_path != "":
+		actual_parent = _create_folder_tree_item(parent, parent_path, structure)
+	
+	var folder_item := tree.create_item(actual_parent)
+	folder_item.set_text(0, folder_data.name)
+	folder_item.set_icon(0, get_theme_icon("Folder", "EditorIcons"))
+	folder_item.set_metadata(0, {"type": "folder", "path": folder_path})
+	folder_item.set_cell_mode(1, TreeItem.CELL_MODE_CHECK)
+	folder_item.set_editable(1, true)
+	folder_item.set_checked(1, false)
+	
+	folder_items[folder_path] = folder_item
+	
+	# Add images in this folder
+	for img_data in folder_data.images:
+		_create_image_tree_item(folder_item, img_data)
+	
+	return folder_item
+
+func _create_image_tree_item(parent: TreeItem, img_data: Dictionary) -> TreeItem:
+	var item := tree.create_item(parent)
+	item.set_text(0, img_data.filename)
+	item.set_icon(0, get_theme_icon("Image", "EditorIcons"))
+	item.set_metadata(0, img_data)
+	item.set_cell_mode(1, TreeItem.CELL_MODE_CHECK)
+	item.set_editable(1, true)
+	item.set_checked(1, false)
+	
+	tree_items[img_data.path] = item
+	return item
+
+func _get_relative_path(full_path: String) -> String:
+	if extracted_path.is_empty():
+		return full_path.get_file()
+	
+	var rel := full_path.replace(extracted_path + "/", "")
+	return rel
+
+func _on_tree_item_selected() -> void:
+	var selected := tree.get_selected()
+	if not selected:
+		_clear_info_panel()
+		return
+	
+	var metadata = selected.get_metadata(0)
+	
+	# Check if it's a folder
+	if metadata is Dictionary and metadata.has("type") and metadata.type == "folder":
+		_display_folder_info(metadata)
+	else:
+		current_selected_image = metadata
+		_display_info(metadata)
+
+func _on_tree_item_edited() -> void:
+	var edited := tree.get_edited()
+	if not edited:
+		return
+	
+	var metadata = edited.get_metadata(0)
+	var is_checked := edited.is_checked(1)
+	
+	if metadata is Dictionary and metadata.has("type") and metadata.type == "folder":
+		# Folder was checked/unchecked - update all children
+		_set_children_checked(edited, is_checked)
+	else:
+		# Image was checked/unchecked
+		metadata.selected = is_checked
+		_update_parent_folder_state(edited)
+	
+	_update_export_buttons_state()
+
+func _update_export_buttons_state() -> void:
+	var has_selected := false
+	for img_data in scanned_images:
+		if img_data.get("selected", false):
+			has_selected = true
+			break
+	
+	validate_button.disabled = not has_selected
+
+func _set_children_checked(folder_item: TreeItem, checked: bool) -> void:
+	var child := folder_item.get_first_child()
+	while child:
+		child.set_checked(1, checked)
+		
+		var child_metadata = child.get_metadata(0)
+		if child_metadata is Dictionary:
+			if child_metadata.has("type") and child_metadata.type == "folder":
+				_set_children_checked(child, checked)
+			else:
+				child_metadata.selected = checked
+		
+		child = child.get_next()
+
+func _update_parent_folder_state(item: TreeItem) -> void:
+	var parent := item.get_parent()
+	if not parent or parent == tree.get_root():
+		return
+	
+	var parent_metadata = parent.get_metadata(0)
+	if not parent_metadata or not parent_metadata.has("type"):
+		return
+	
+	if parent_metadata.type != "folder":
+		return
+	
+	# Check if all children are checked
+	var all_checked := true
+	var any_checked := false
+	var child := parent.get_first_child()
+	
+	while child:
+		if child.is_checked(1):
+			any_checked = true
+		else:
+			all_checked = false
+		child = child.get_next()
+	
+	# Update parent checkbox state
+	parent.set_checked(1, all_checked)
+	
+	# Recursively update grandparent
+	_update_parent_folder_state(parent)
+
+func _display_folder_info(folder_data: Dictionary) -> void:
+	for child in info_panel.get_children():
+		child.queue_free()
+	
+	var folder_path: String = folder_data.path
+	var image_count := _count_images_in_folder(folder_path)
+	
+	# Title with icon
+	_add_info_header("Folder Info", "Folder")
+	_add_info_spacer()
+	
+	# Folder info
+	_add_info_item("Path", folder_path, "FolderBrowse", Color(1.0, 0.9, 0.5))
+	_add_info_item("Images", str(image_count), "Image", Color(0.8, 1.0, 0.8))
+	_add_info_spacer()
+	
+	# Hint
+	var hint := Label.new()
+	hint.text = "💡 Check the folder to select all images inside"
+	hint.add_theme_color_override("font_color", Color(0.7, 0.7, 0.8, 1.0))
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info_panel.add_child(hint)
+
+func _count_images_in_folder(folder_path: String) -> int:
+	var count := 0
+	for img_data in scanned_images:
+		var rel_path := _get_relative_path(img_data.path)
+		if rel_path.begins_with(folder_path + "/") or rel_path.get_base_dir() == folder_path:
+			count += 1
+	return count
+
+func _display_info(img_data: Dictionary) -> void:
+	for child in info_panel.get_children():
+		child.queue_free()
+	
+	current_preview_widget = null
+	current_animation_index = 0
+	
+	# Title with icon
+	_add_info_header("SpriteSheet Info", "Image")
+	_add_info_spacer()
+	
+	# File info
+	_add_info_item("File", img_data.filename, "File", Color(0.8, 0.8, 1.0))
+	_add_info_item("Sheet Size", "%d × %d px" % [img_data.width, img_data.height], "Ruler", Color(0.8, 1.0, 0.8))
+	_add_info_spacer()
+	
+	# Grid detection
+	_add_info_header("Grid Detection", "Grid")
+	_add_info_item("Cell Size", "%d × %d px" % [img_data.cell_width, img_data.cell_height], "Vector2", Color(1.0, 0.9, 0.6))
+	_add_info_item("Columns", str(img_data.columns), "GuiTreeArrowRight", Color(0.6, 0.8, 1.0))
+	_add_info_item("Rows", str(img_data.rows), "GuiTreeArrowDown", Color(0.6, 0.8, 1.0))
+	_add_info_item("Total Tiles", str(img_data.total_tiles), "Grid", Color(1.0, 0.8, 0.6))
+	_add_info_spacer()
+	
+	# Animation info
+	var is_horizontal := direction_option.selected == 0
+	_add_info_header("Animations", "AnimationPlayer")
+	if is_horizontal:
+		_add_info_item("Count", "%d (one per row)" % img_data.rows, "Animation", Color(1.0, 0.7, 0.9))
+	else:
+		_add_info_item("Count", "%d (one per column)" % img_data.columns, "Animation", Color(1.0, 0.7, 0.9))
+	
+	var preview_container := _create_animated_preview(img_data)
+	if preview_container:
+		info_panel.add_child(preview_container)
+
+func _add_info_header(text: String, icon_name: String) -> void:
+	var hbox := HBoxContainer.new()
+	
+	var icon := TextureRect.new()
+	icon.texture = get_theme_icon(icon_name, "EditorIcons")
+	icon.custom_minimum_size = Vector2(16, 16)
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	hbox.add_child(icon)
+	
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 16)
+	label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+	hbox.add_child(label)
+	
+	info_panel.add_child(hbox)
+
+func _add_info_item(key: String, value: String, icon_name: String, color: Color) -> void:
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 8)
+	
+	var icon := TextureRect.new()
+	icon.texture = get_theme_icon(icon_name, "EditorIcons")
+	icon.custom_minimum_size = Vector2(16, 16)
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.modulate = color
+	hbox.add_child(icon)
+	
+	var key_label := Label.new()
+	key_label.text = key + ":"
+	key_label.custom_minimum_size.x = 100
+	key_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+	hbox.add_child(key_label)
+	
+	var value_label := Label.new()
+	value_label.text = value
+	value_label.add_theme_color_override("font_color", color)
+	hbox.add_child(value_label)
+	
+	info_panel.add_child(hbox)
+
+func _add_info_spacer() -> void:
+	var spacer := Control.new()
+	spacer.custom_minimum_size.y = 8
+	info_panel.add_child(spacer)
+
+func _create_animated_preview(img_data: Dictionary) -> Control:
+	var img := Image.new()
+	if img.load(img_data.path) != OK:
+		return null
+	
+	var container := VBoxContainer.new()
+	
+	var is_horizontal := direction_option.selected == 0
+	var total_animations: int = img_data.rows if is_horizontal else img_data.columns
+	
+	# Animation selector
+	var selector_container := HBoxContainer.new()
+	var prev_btn := Button.new()
+	prev_btn.text = "◀"
+	prev_btn.custom_minimum_size = Vector2(40, 30)
+	
+	var anim_label := Label.new()
+	anim_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	anim_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	anim_label.text = "Animation 1 / %d" % total_animations
+	
+	var next_btn := Button.new()
+	next_btn.text = "▶"
+	next_btn.custom_minimum_size = Vector2(40, 30)
+	
+	selector_container.add_child(prev_btn)
+	selector_container.add_child(anim_label)
+	selector_container.add_child(next_btn)
+	container.add_child(selector_container)
+	
+	# Create preview using our reusable scene
+	var preview_scene := preload("res://addons/tiled_image_scanner/animated_preview.tscn")
+	var texture := ImageTexture.create_from_image(img)
+	
+	# Prepare all animations with empty frame filtering
+	var all_animations: Array[Array] = []  # Array of frame_rects arrays
+	
+	var cell_width: int = img_data.cell_width
+	var cell_height: int = img_data.cell_height
+	var offset_x: int = img_data.offset_x
+	var offset_y: int = img_data.offset_y
+	
+	if is_horizontal:
+		# One animation per row
+		for row in range(img_data.rows):
+			var frame_rects: Array[Rect2] = []
+			for col in range(img_data.columns):
+				var x: int = offset_x + col * cell_width
+				var y: int = offset_y + row * cell_height
+				
+				# Bounds check before calling _is_frame_empty
+				if x >= 0 and y >= 0 and x + cell_width <= img.get_width() and y + cell_height <= img.get_height():
+					# Filter empty frames
+					if not TiledImageExportUtils._is_frame_empty(img, x, y, cell_width, cell_height):
+						frame_rects.append(Rect2(x, y, cell_width, cell_height))
+			if frame_rects.size() > 0:  # Only add non-empty animations
+				all_animations.append(frame_rects)
+	else:
+		# One animation per column
+		for col in range(img_data.columns):
+			var frame_rects: Array[Rect2] = []
+			for row in range(img_data.rows):
+				var x: int = offset_x + col * cell_width
+				var y: int = offset_y + row * cell_height
+				
+				# Bounds check before calling _is_frame_empty
+				if x >= 0 and y >= 0 and x + cell_width <= img.get_width() and y + cell_height <= img.get_height():
+					# Filter empty frames
+					if not TiledImageExportUtils._is_frame_empty(img, x, y, cell_width, cell_height):
+						frame_rects.append(Rect2(x, y, cell_width, cell_height))
+			if frame_rects.size() > 0:  # Only add non-empty animations
+				all_animations.append(frame_rects)
+	
+	# Create preview instance and setup with first animation
+	var preview = preview_scene.instantiate()
+	preview.custom_minimum_size = Vector2(200, 200)
+	container.add_child(preview)
+	
+	if all_animations.size() > 0:
+		preview.setup(texture, all_animations[0])
+	
+	current_preview_widget = preview
+	current_animation_index = 0
+	
+	# Create timer for info panel preview
+	if info_panel_timer:
+		info_panel_timer.stop()
+		info_panel_timer.queue_free()
+	
+	info_panel_timer = Timer.new()
+	var fps := int(fps_spinbox.value)
+	info_panel_timer.wait_time = 1.0 / max(fps, 1)
+	info_panel_timer.autostart = true
+	info_panel_timer.timeout.connect(func():
+		if is_instance_valid(current_preview_widget):
+			current_preview_widget.advance_frame()
+	)
+	add_child(info_panel_timer)
+	
+	# Update label with actual animation count
+	var actual_count := all_animations.size()
+	anim_label.text = "Animation 1 / %d" % actual_count
+	
+	# Connect buttons to switch animations
+	prev_btn.pressed.connect(func():
+		if current_animation_index > 0:
+			current_animation_index -= 1
+			if is_instance_valid(current_preview_widget):
+				current_preview_widget.setup(texture, all_animations[current_animation_index])
+			anim_label.text = "Animation %d / %d" % [current_animation_index + 1, actual_count]
+	)
+	
+	next_btn.pressed.connect(func():
+		if current_animation_index < actual_count - 1:
+			current_animation_index += 1
+			if is_instance_valid(current_preview_widget):
+				current_preview_widget.setup(texture, all_animations[current_animation_index])
+			anim_label.text = "Animation %d / %d" % [current_animation_index + 1, actual_count]
+	)
+	
+	return container
+
+
+func _clear_info_panel() -> void:
+	# Stop info panel timer
+	if info_panel_timer:
+		info_panel_timer.stop()
+		info_panel_timer.queue_free()
+		info_panel_timer = null
+	
+	current_preview_widget = null
+	
+	for child in info_panel.get_children():
+		child.queue_free()
+	
+	var label := Label.new()
+	label.text = "Select an image to view details"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	info_panel.add_child(label)
+
+func _on_validate_pressed() -> void:
+	# Collect selected items
+	var selected_items: Array[Dictionary] = []
+	for img_data in scanned_images:
+		if img_data.get("selected", false):
+			selected_items.append(img_data)
+	
+	if selected_items.is_empty():
+		status_label.text = "No images selected"
+		return
+	
+	# Build animation list with pre-calculated filtered frames
+	var fps := int(fps_spinbox.value)
+	var is_horizontal := direction_option.selected == 0
+	var animations: Array[Dictionary] = []
+	
+	for img_data in selected_items:
+		var base_name: String = img_data.filename.get_basename()
+		
+		# Load image to filter empty frames
+		var img := Image.new()
+		if img.load(img_data.path) != OK:
+			continue
+		
+		var cell_width: int = img_data.cell_width
+		var cell_height: int = img_data.cell_height
+		var offset_x: int = img_data.offset_x
+		var offset_y: int = img_data.offset_y
+		
+		if is_horizontal:
+			for row in range(img_data.rows):
+				# Pre-calculate filtered frames for this animation
+				var frame_rects: Array[Rect2] = []
+				for col in range(img_data.columns):
+					var x: int = offset_x + col * cell_width
+					var y: int = offset_y + row * cell_height
+					
+					# Bounds check before calling _is_frame_empty
+					if x >= 0 and y >= 0 and x + cell_width <= img.get_width() and y + cell_height <= img.get_height():
+						# Filter empty frames
+						if not TiledImageExportUtils._is_frame_empty(img, x, y, cell_width, cell_height):
+							frame_rects.append(Rect2(x, y, cell_width, cell_height))
+				
+				# Only add animations with at least one visible frame
+				if frame_rects.size() > 0:
+					animations.append({
+						"original_name": base_name + "_row_%d" % row,
+						"display_name": base_name + "_row_%d" % row,
+						"img_data": img_data,
+						"row": row,
+						"col": -1,
+						"frame_rects": frame_rects  # Store filtered frames
+					})
+		else:
+			for col in range(img_data.columns):
+				# Pre-calculate filtered frames for this animation
+				var frame_rects: Array[Rect2] = []
+				for row in range(img_data.rows):
+					var x: int = offset_x + col * cell_width
+					var y: int = offset_y + row * cell_height
+					
+					# Bounds check before calling _is_frame_empty
+					if x >= 0 and y >= 0 and x + cell_width <= img.get_width() and y + cell_height <= img.get_height():
+						# Filter empty frames
+						if not TiledImageExportUtils._is_frame_empty(img, x, y, cell_width, cell_height):
+							frame_rects.append(Rect2(x, y, cell_width, cell_height))
+				
+				# Only add animations with at least one visible frame
+				if frame_rects.size() > 0:
+					animations.append({
+						"original_name": base_name + "_col_%d" % col,
+						"display_name": base_name + "_col_%d" % col,
+						"img_data": img_data,
+						"row": -1,
+						"col": col,
+						"frame_rects": frame_rects  # Store filtered frames
+					})
+	
+	_show_naming_view(animations)
+
+func _show_naming_view(animations: Array[Dictionary]) -> void:
+	scan_view.visible = false
+	naming_view.visible = true
+	
+	# Set default node name
+	node_name_edit.text = "MergedAnimations"
+	
+	# Clear previous inputs and stop old timer
+	if preview_timer:
+		preview_timer.stop()
+		preview_timer.queue_free()
+		preview_timer = null
+	
+	for child in animations_grid.get_children():
+		child.queue_free()
+	animation_name_inputs.clear()
+	animation_previews.clear()
+	
+	# Setup grid (auto-sizing based on window width, aim for ~220px cells)
+	animations_grid.columns = max(1, int(size.x / 220))
+	
+	var fps := int(fps_spinbox.value)
+	
+	# Create shared timer for all previews
+	preview_timer = Timer.new()
+	preview_timer.wait_time = 1.0 / max(fps, 1)
+	preview_timer.autostart = true
+	preview_timer.timeout.connect(_on_preview_timer_timeout)
+	add_child(preview_timer)
+	
+	# Load the animated preview scene
+	var preview_scene := preload("res://addons/tiled_image_scanner/animated_preview.tscn")
+	
+	# Add animation previews with name inputs
+	for anim in animations:
+		var cell_container = VBoxContainer.new()
+		cell_container.custom_minimum_size = Vector2(200, 250)
+		
+		# Use pre-calculated frame_rects (already filtered for empty frames)
+		if anim.has("frame_rects") and anim.frame_rects.size() > 0:
+			var img := Image.new()
+			if img.load(anim.img_data.path) == OK:
+				var texture := ImageTexture.create_from_image(img)
+				
+				# Instantiate the animated preview scene
+				var preview = preview_scene.instantiate()
+				preview.custom_minimum_size = Vector2(200, 200)
+				cell_container.add_child(preview)
+				
+				# Setup the preview with texture and pre-calculated frame rects
+				preview.setup(texture, anim.frame_rects)
+				
+				# Add to preview list for shared timer
+				animation_previews.append(preview)
+		
+		# Add name input
+		var line_edit = LineEdit.new()
+		line_edit.text = anim.display_name
+		line_edit.placeholder_text = "Animation name"
+		cell_container.add_child(line_edit)
+		
+		animations_grid.add_child(cell_container)
+		
+		animation_name_inputs[anim.original_name] = {
+			"input": line_edit,
+			"data": anim
+		}
+
+func _on_preview_timer_timeout():
+	# Advance frame for all previews
+	for preview in animation_previews:
+		if is_instance_valid(preview):
+			preview.advance_frame()
+	
+	export_anim_player_button.disabled = false
+	export_animated_sprite_button.disabled = false
+
+func _on_back_pressed() -> void:
+	scan_view.visible = true
+	naming_view.visible = false
+	export_anim_player_button.disabled = true
+	export_animated_sprite_button.disabled = true
+
+func _on_export_anim_player_pressed() -> void:
+	var scene_root = EditorInterface.get_edited_scene_root()
+	if not scene_root:
+		status_label.text = "Error: No scene is currently open"
+		return
+	
+	# Get custom animation names and filtered frame data from inputs
+	var animation_mappings: Dictionary = {}
+	var animations_data: Array[Dictionary] = []
+	
+	for orig_name in animation_name_inputs:
+		var input: LineEdit = animation_name_inputs[orig_name].input
+		var anim_data: Dictionary = animation_name_inputs[orig_name].data
+		
+		animation_mappings[orig_name] = input.text
+		animations_data.append(anim_data)  # Contains frame_rects already filtered
+	
+	var selected_items: Array[Dictionary] = []
+	for img_data in scanned_images:
+		if img_data.get("selected", false):
+			selected_items.append(img_data)
+	
+	if selected_items.is_empty():
+		status_label.text = "No images selected"
+		return
+	
+	var node_name: String = node_name_edit.text if node_name_edit.text != "" else "MergedAnimations"
+	var fps := int(fps_spinbox.value)
+	var is_horizontal := direction_option.selected == 0
+	
+	var anim_player := TiledImageExportUtils.export_to_animation_player(
+		selected_items, fps, is_horizontal, scene_root, node_name, animation_mappings, animations_data
+	)
+	
+	if anim_player:
+		status_label.text = "Created merged AnimationPlayer with %d animation(s)" % anim_player.get_animation_list().size()
+		EditorInterface.edit_node(scene_root)
+		_on_back_pressed()  # Return to scan view
+	else:
+		status_label.text = "Failed to create AnimationPlayer"
+
+func _on_export_animated_sprite_pressed() -> void:
+	var scene_root = EditorInterface.get_edited_scene_root()
+	if not scene_root:
+		status_label.text = "Error: No scene is currently open"
+		return
+	
+	# Get custom animation names and filtered frame data from inputs
+	var animation_mappings: Dictionary = {}
+	var animations_data: Array[Dictionary] = []
+	
+	for orig_name in animation_name_inputs:
+		var input: LineEdit = animation_name_inputs[orig_name].input
+		var anim_data: Dictionary = animation_name_inputs[orig_name].data
+		
+		animation_mappings[orig_name] = input.text
+		animations_data.append(anim_data)  # Contains frame_rects already filtered
+	
+	var selected_items: Array[Dictionary] = []
+	for img_data in scanned_images:
+		if img_data.get("selected", false):
+			selected_items.append(img_data)
+	
+	if selected_items.is_empty():
+		status_label.text = "No images selected"
+		return
+	
+	var node_name: String = node_name_edit.text if node_name_edit.text != "" else "MergedAnimations"
+	var fps := int(fps_spinbox.value)
+	var is_horizontal := direction_option.selected == 0
+	
+	var animated_sprite := TiledImageExportUtils.export_to_animated_sprite(
+		selected_items, fps, is_horizontal, scene_root, node_name, animation_mappings, animations_data
+	)
+	
+	if animated_sprite:
+		status_label.text = "Created merged AnimatedSprite2D with %d animation(s)" % animated_sprite.sprite_frames.get_animation_names().size()
+		EditorInterface.edit_node(scene_root)
+		_on_back_pressed()  # Return to scan view
+	else:
+		status_label.text = "Failed to create AnimatedSprite2D"

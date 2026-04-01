@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://c8ykgn6f2g7pk"]
+
+[ext_resource type="Script" path="res://addons/tiled_image_scanner/components/info_item.gd" id="1"]
+
+[node name="InfoItem" type="HBoxContainer"]
+script = ExtResource("1")
+theme_override_constants/separation = 8
+
+[node name="Icon" type="TextureRect" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+stretch_mode = 5
+
+[node name="Key" type="Label" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+
+[node name="Value" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 2

@@ -1,74 +1,154 @@
-# 🎬 AnimSheet - Bring Your Spritesheets to Life!
+# AnimSheet V2 ⚡
 
-✨ **Turn your sprite sheets into fully-animated sprites with just a few clicks!** ✨
+**Batch process your sprite sheets like a pro.** Scan entire folders or ZIP archives, detect grids automatically, and export ready-to-use AnimatedSprite2D or AnimationPlayer nodes with custom naming.
 
-
-![Plugin Screenshot](images/demo.png)
-![Plugin Screenshot 2](images/demo2.png)
+![Selection View](images/selection.gif)
 
 **SpriteSheet Source:** [Snoblin's Pixel RPG Free NPC](https://snoblin.itch.io/pixel-rpg-free-npc)
 
-Say goodbye to the hassle of manually setting up Animation Player ! AnimSheet lets you **effortlessly create `Sprite2D` and `AnimationPlayer` or one `AnimatedSprite2D` nodes** directly from your sprite sheets. Just **load**, **define**, and **generate animation** – it's that easy! 🚀
+---
+
+## ✨ What's New in V2
+
+AnimSheet V2 is a **complete rewrite** focused on batch processing workflows. If you've used V1, you'll notice this version takes a different approach - it's all about handling multiple sprite sheets efficiently in one go.
+
+**V2 brings you:**
+- 📦 **Batch scanning** - Process folders or ZIP archives full of sprite sheets
+- 🔍 **Automatic grid detection** - Frequency-based analysis finds tile sizes for you
+- 🎨 **Custom naming workflow** - Name your animations before export
+- 🚀 **Streamlined export** - Choose AnimatedSprite2D or AnimationPlayer output
+
+**Important:** V2 doesn't allow manual drag and select currently. If you need the original V1 with manual frame selection, check out the V1 branch.
 
 ---
 
 ## 🎯 Features
 
- **Supports Common Formats** – Load PNG, JPG, WEBP, and more!  
- **Visual Feedback** – See a **grid overlay** on your sprite sheet for easy alignment.  
- **Fast Animation Setup:**  
-   - 🔍 **Auto-Detect** – Let AnimSheet find animations automatically! Works with transparent backgrounds and strips.
-   - 🖱️ **Manual Drag & Drop** – Draw animation frames directly on the sprite sheet preview!
-**Custom FPS Settings** – Control playback speed per animation.  
-**One-Click Node Generation** – Instantly create `Sprite2D` and `AnimationPlayer` nodes with correctly set animation tracks. 
+### Batch Processing Made Easy
+Stop processing sprite sheets one at a time! Load an entire folder or ZIP archive and let AnimSheet scan everything at once.
+
+- Scan folders recursively for all your sprite sheets
+- Extract and process ZIP archives on the fly
+- Handle multiple image formats (PNG, JPG, WEBP, and more)
+
+![Multiple Preview](images/multiplepreview.gif)
+
+### Smart Grid Detection
+AnimSheet analyzes your sprite sheets using frequency-based column and row detection to find consistent tile patterns:
+
+- ✓ Detects cell width and height automatically
+- ✓ Finds grid offsets for sheets with padding
+- ✓ Works great with evenly-spaced tiles
+- ✓ Manual override available for any parameter
+
+**What it doesn't do:** AnimSheet V2 won't detect individual animations or optimize frame counts. Every row or column becomes its own animation - perfect for organized sprite sheets!
+
+### Custom Naming System
+Give your animations meaningful names before export:
+
+- Name each animation strip (idle, walk, run, attack, etc.)
+- Set a base node name for your exports
+- Configure direction (horizontal rows or vertical columns)
+- Preview everything before committing
+
+### Export Options
+
+Choose the format that fits your workflow:
+
+**🎬 AnimatedSprite2D** - All-in-one solution
+
+![AnimatedSprite2D Output](images/animatedsprite.png)
+
+Perfect for simple sprite animations. Everything's bundled in a single node.
+
+**🎮 AnimationPlayer** - Maximum control
+
+![AnimationPlayer Output](images/animationplayer.png)
+
+Get a Sprite2D + AnimationPlayer pair for advanced animation control and scripting.
+
+![Export Process](images/export.gif)
 
 ---
 
-## 🚀 Installation
+## 📥 Installation
 
-### 📦 **From Asset Library** (Recommended)
-1. Open **Godot Editor** and go to the `AssetLib` tab.
-2. Search for **AnimSheet**.
-3. Download & install the plugin.
-4. Enable it in **Project -> Project Settings -> Plugins**.
+### From Asset Library (Recommended)
+1. Open Godot and head to the **AssetLib** tab
+2. Search for **AnimSheet**
+3. Download and install
+4. Enable it in **Project → Project Settings → Plugins**
 
-### 🔧 **Manual Installation**
-1. Download the `addons/anim_sheet` folder from this repository.
-2. Place the `addons` folder in your Godot project directory.
-3. Enable the plugin in **Project -> Project Settings -> Plugins**.
+### Manual Installation
+1. Grab the `addons/anim_sheet` folder from this repo
+2. Drop it into your project's `addons/` directory
+3. Enable in **Project → Project Settings → Plugins**
 
 ---
 
-## 🛠️ How to Use
+## 🚀 How to Use
 
- **1. Open the Plugin:**  
-Go to `Project -> Tools -> Sprite Sheet Animator` in the Godot Editor.
+### Step 1: Open AnimSheet
+Look for the AnimSheet tab in the top toolbar - it sits right next to 2D, 3D, and Script.
 
- **2. Load Your Sprite Sheet:**  
-Click the **Load Texture** button and select your sprite sheet image.
+### Step 2: Load Your Sprite Sheets
+Two ways to load:
+- **Select Folder** - Scan a directory for images
+- **Select ZIP** - Extract and scan an archive
 
- **3. Set Frame Size:**  
-Adjust **Sprite Width** and **Sprite Height** to match the size of a single frame.
+AnimSheet will automatically detect grid dimensions for each sprite sheet it finds.
 
- **4. Define Animations:**  
- 
- **A. Auto-Detect Mode**
-  - Choose the animation layout **(Horizontal or Vertical)**.
-  - (Optional) Set "Frames Per Anim" to split longer strips into multiple animations.
-  - Click **Auto Detect Animations** – magic happens! ✨
-  
-  **B. Manual Mode**
-  - Click & drag to **draw rectangles** around animation frames.
+### Step 3: Review the Results
+Check out the tree view on the left. Each detected sprite sheet shows:
+- 🖼️ Grid overlay preview
+- 📊 Dimensions (cell size, columns, rows)
+- 📐 Detected offset values
+- ⚙️ Manual adjustment options
 
-**5. Fine-Tune Your Animations (Optional):**  
--  Rename: Click an animation’s name label (e.g., "Anim1") to rename it.
--  Delete: Right-click an animation's outline to remove it.
+### Step 4: Configure Animation Settings
+Before moving forward:
+- Set your **FPS** (frames per second)
+- Choose **Direction**: Horizontal (row-based) or Vertical (column-based)
 
-**6. Generate Nodes:**  
-- Open a scene in Godot.
-- Click **Generate Nodes** and watch your sprite come to life! 🎉
+Hit **Validate** when you're ready!
+
+### Step 5: Name Your Animations
+Now comes the fun part - name each animation strip:
+- Set the base node name
+- Give meaningful names to each animation (e.g., "idle", "walk", "jump")
+- Use the built-in preview to see your animations play
+
+### Step 6: Export
+Pick your format:
+- **AnimatedSprite2D** for simple, self-contained animated sprites
+- **AnimationPlayer** for sprites with separate animation control
+
+Nodes are created directly in your currently open scene. Done! 🎉
+
+---
+
+## 🔧 Technical Details
+
+### Grid Detection Algorithm
+AnimSheet uses **autocorrelation-based pattern detection**, a signal processing technique that finds repeating patterns in data:
+
+1. **Projection Building** - Creates horizontal and vertical projections by counting non-transparent pixels along each row and column
+2. **Autocorrelation Analysis** - Correlates each projection with shifted versions of itself to detect periodic patterns 
+3. **Peak Detection** - Identifies prominent peaks in the autocorrelation signal 
+4. **Grid Optimization** - Refines the detected spacing by testing divisors of the image dimensions and scoring them based on:
+   - How well they align with detected periods
+   - Minimizing pixel density at grid boundaries (finding the "gaps" between tiles)
+
+This works very well with most sprite sheets I tested.
 
 ---
 
 ## 📜 License
-This project is licensed under **MIT** – use it freely in your games! 🚀
+
+AnimSheet is licensed under the **MIT License**. See [LICENSE.md](LICENSE.md) for the full text.
+
+**TL;DR:** Use it in your personal projects, commercial games, game jams ! Free and open source. 
+
+---
+
+**Enjoy using AnimSheet?** Consider starring the repo or sharing it with other game devs! 🌟

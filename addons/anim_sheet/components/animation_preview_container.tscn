@@ -1,0 +1,27 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://addons/tiled_image_scanner/components/animation_preview_container.gd" id="1_container"]
+[ext_resource type="PackedScene" path="res://addons/tiled_image_scanner/components/animated_preview.tscn" id="2_preview"]
+
+[node name="AnimationPreviewContainer" type="VBoxContainer"]
+script = ExtResource("1_container")
+
+[node name="SelectorContainer" type="HBoxContainer" parent="."]
+
+[node name="PrevButton" type="Button" parent="SelectorContainer"]
+custom_minimum_size = Vector2(40, 30)
+text = "◀"
+
+[node name="AnimLabel" type="Label" parent="SelectorContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+text = "Animation 1 / 1"
+
+[node name="NextButton" type="Button" parent="SelectorContainer"]
+custom_minimum_size = Vector2(40, 30)
+text = "▶"
+
+[node name="AnimatedPreview" parent="." instance=ExtResource("2_preview")]
+custom_minimum_size = Vector2(200, 200)
+layout_mode = 2

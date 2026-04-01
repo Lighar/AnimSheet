@@ -1,0 +1,246 @@
+[gd_scene format=3 uid="uid://cm3w2xo4j76e7"]
+
+[ext_resource type="Script" uid="uid://rvedufe7j2ot" path="res://addons/tiled_image_scanner/tiled_scanner_window.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://cdmxhl77nvgxg" path="res://addons/tiled_image_scanner/icon.svg" id="2_w3u2a"]
+[ext_resource type="Texture2D" uid="uid://c57l6vq7osd4s" path="res://addons/tiled_image_scanner/github_icon.svg" id="3_github"]
+
+[node name="TiledScannerWindow" type="Control" unique_id=1309302026]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("1")
+
+[node name="BannerHBox" type="HBoxContainer" parent="." unique_id=1420231354]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 50.0
+grow_horizontal = 2
+
+[node name="IconRect" type="TextureRect" parent="BannerHBox" unique_id=571614906]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+texture = ExtResource("2_w3u2a")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="TitleLabel" type="Label" parent="BannerHBox" unique_id=2082416106]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "AnimSheet"
+vertical_alignment = 1
+
+[node name="Spacer" type="Control" parent="BannerHBox" unique_id=160226600]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="GithubButton" type="Button" parent="BannerHBox" unique_id=897452742]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+text = "Support on Github"
+icon = ExtResource("3_github")
+
+[node name="GithubConfirmDialog" type="ConfirmationDialog" parent="." unique_id=1141938812]
+unique_name_in_owner = true
+oversampling_override = 1.0
+title = "Open Github Repository"
+position = Vector2i(0, 36)
+size = Vector2i(549, 100)
+ok_button_text = "Confirm"
+dialog_text = "Open AnimSheet repository in your web browser?"
+
+[node name="ScanView" type="VBoxContainer" parent="." unique_id=2113536671]
+unique_name_in_owner = true
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 60.0
+offset_right = -10.0
+offset_bottom = -10.0
+
+[node name="ControlPanel" type="VBoxContainer" parent="ScanView" unique_id=20989014]
+layout_mode = 2
+size_flags_vertical = 0
+
+[node name="ButtonsContainer" type="HBoxContainer" parent="ScanView/ControlPanel" unique_id=546770553]
+layout_mode = 2
+
+[node name="SelectZipButton" type="Button" parent="ScanView/ControlPanel/ButtonsContainer" unique_id=656611059]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Select ZIP"
+
+[node name="SelectFolderButton" type="Button" parent="ScanView/ControlPanel/ButtonsContainer" unique_id=2141815274]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Select Folder"
+
+[node name="AnimationSettings" type="VBoxContainer" parent="ScanView/ControlPanel" unique_id=1209651551]
+layout_mode = 2
+
+[node name="FPSContainer" type="HBoxContainer" parent="ScanView/ControlPanel/AnimationSettings" unique_id=311774704]
+layout_mode = 2
+
+[node name="FPSLabel" type="Label" parent="ScanView/ControlPanel/AnimationSettings/FPSContainer" unique_id=68223298]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Animation FPS:"
+
+[node name="FPSSpinBox" type="SpinBox" parent="ScanView/ControlPanel/AnimationSettings/FPSContainer" unique_id=1450392688]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 1.0
+max_value = 60.0
+value = 10.0
+
+[node name="DirectionContainer" type="HBoxContainer" parent="ScanView/ControlPanel/AnimationSettings" unique_id=1603283840]
+layout_mode = 2
+
+[node name="DirectionLabel" type="Label" parent="ScanView/ControlPanel/AnimationSettings/DirectionContainer" unique_id=520352033]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Direction:"
+
+[node name="DirectionOption" type="OptionButton" parent="ScanView/ControlPanel/AnimationSettings/DirectionContainer" unique_id=1218284644]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+selected = 0
+item_count = 2
+popup/item_0/text = "Horizontal (Row-based)"
+popup/item_0/id = 0
+popup/item_1/text = "Vertical (Column-based)"
+popup/item_1/id = 1
+
+[node name="StatusLabel" type="Label" parent="ScanView/ControlPanel" unique_id=1608644831]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Select a ZIP file to begin"
+
+[node name="HSeparator2" type="HSeparator" parent="ScanView/ControlPanel" unique_id=2129899103]
+layout_mode = 2
+
+[node name="HSplitContainer" type="HSplitContainer" parent="ScanView" unique_id=1373759016]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="LeftPanel" type="VBoxContainer" parent="ScanView/HSplitContainer" unique_id=1264657410]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.5
+
+[node name="Tree" type="Tree" parent="ScanView/HSplitContainer/LeftPanel" unique_id=2008326294]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+columns = 2
+column_titles_visible = true
+allow_reselect = true
+hide_root = true
+
+[node name="RightPanel" type="VBoxContainer" parent="ScanView/HSplitContainer" unique_id=2131955291]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ScrollContainer" type="ScrollContainer" parent="ScanView/HSplitContainer/RightPanel" unique_id=1094807996]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="InfoPanel" type="VBoxContainer" parent="ScanView/HSplitContainer/RightPanel/ScrollContainer" unique_id=1503848670]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="BottomPanel" type="VBoxContainer" parent="ScanView" unique_id=290331391]
+layout_mode = 2
+
+[node name="HSeparator3" type="HSeparator" parent="ScanView/BottomPanel" unique_id=1973055308]
+layout_mode = 2
+
+[node name="ValidateButton" type="Button" parent="ScanView/BottomPanel" unique_id=1099899919]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "Validate Selected Sprites and Name Animations"
+
+[node name="NamingView" type="VBoxContainer" parent="." unique_id=1560437689]
+unique_name_in_owner = true
+visible = false
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 60.0
+offset_right = -10.0
+offset_bottom = -10.0
+
+[node name="TopPanel" type="VBoxContainer" parent="NamingView" unique_id=1000375408]
+layout_mode = 2
+
+[node name="NodeNameLabel" type="Label" parent="NamingView/TopPanel" unique_id=1013815822]
+layout_mode = 2
+text = "Exported Name:"
+
+[node name="NodeNameEdit" type="LineEdit" parent="NamingView/TopPanel" unique_id=1574706431]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "ExportedAnimationNode"
+
+[node name="HSeparator" type="HSeparator" parent="NamingView/TopPanel" unique_id=945433896]
+layout_mode = 2
+
+[node name="AnimationsLabel" type="Label" parent="NamingView/TopPanel" unique_id=1474739543]
+layout_mode = 2
+text = "Animation Names:"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="NamingView" unique_id=1896303971]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="AnimationsGrid" type="GridContainer" parent="NamingView/ScrollContainer" unique_id=1389646308]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BottomPanel" type="VBoxContainer" parent="NamingView" unique_id=1662694295]
+layout_mode = 2
+
+[node name="HSeparator" type="HSeparator" parent="NamingView/BottomPanel" unique_id=1756493676]
+layout_mode = 2
+
+[node name="ButtonsContainer" type="HBoxContainer" parent="NamingView/BottomPanel" unique_id=555036339]
+layout_mode = 2
+
+[node name="BackButton" type="Button" parent="NamingView/BottomPanel/ButtonsContainer" unique_id=873071299]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Back"
+
+[node name="ExportAnimPlayerButton" type="Button" parent="NamingView/BottomPanel/ButtonsContainer" unique_id=1916737896]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "To AnimationPlayer"
+
+[node name="ExportAnimatedSpriteButton" type="Button" parent="NamingView/BottomPanel/ButtonsContainer" unique_id=1826258084]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "To AnimatedSprite2D"

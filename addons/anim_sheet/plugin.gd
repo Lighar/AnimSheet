@@ -1,47 +1,26 @@
 @tool
 extends EditorPlugin
 
-var main_panel_instance
-var popup_window : Window
+var main_panel: Control
 
-const MENU_ITEM_NAME = "Sprite Sheet Animator..."
+func _enter_tree() -> void:
+	main_panel = preload("res://addons/tiled_image_scanner/tiled_scanner_window.tscn").instantiate()
+	get_editor_interface().get_editor_main_screen().add_child(main_panel)
+	_make_visible(false)
 
-func _enter_tree():
+func _exit_tree() -> void:
+	if main_panel:
+		main_panel.queue_free()
 
-	var MainPanelScene = preload("res://addons/anim_sheet/SpriteSheetAnimatorPanel.tscn")
-	main_panel_instance = MainPanelScene.instantiate()
+func _has_main_screen() -> bool:
+	return true
 
-	popup_window = Window.new()
-	popup_window.title = "Sprite Sheet Animator"
-	popup_window.size = Vector2i(800, 600)
-	popup_window.min_size = Vector2i(500, 400)
-	popup_window.initial_position = Window.WINDOW_INITIAL_POSITION_CENTER_MAIN_WINDOW_SCREEN
-	popup_window.wrap_controls = true
-	popup_window.visible = false
-	popup_window.transient = true
-	popup_window.exclusive = false
+func _make_visible(visible: bool) -> void:
+	if main_panel:
+		main_panel.visible = visible
 
-	popup_window.add_child(main_panel_instance)
-	get_editor_interface().get_editor_main_screen().add_child(popup_window)
-	popup_window.close_requested.connect(_on_popup_close_requested)
-	add_tool_menu_item(MENU_ITEM_NAME, Callable(self, "_show_popup"))
+func _get_plugin_name() -> String:
+	return "AnimSheet"
 
-func _exit_tree():
-
-	remove_tool_menu_item(MENU_ITEM_NAME)
-
-	if is_instance_valid(popup_window):
-		popup_window.queue_free()
-		popup_window = null
-
-	if is_instance_valid(main_panel_instance):
-		main_panel_instance = null
-
-func _on_popup_close_requested():
-	if is_instance_valid(popup_window):
-		popup_window.hide()
-
-func _show_popup():
-	print("Sprite Sheet Animator opened")
-	if is_instance_valid(popup_window):
-		popup_window.popup_centered()
+func _get_plugin_icon() -> Texture2D:
+	return get_editor_interface().get_base_control().get_theme_icon("Image", "EditorIcons")
