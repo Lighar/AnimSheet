@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3]
 
-[ext_resource type="Script" path="res://addons/tiled_image_scanner/components/animation_name_cell.gd" id="1_cell"]
-[ext_resource type="PackedScene" path="res://addons/tiled_image_scanner/components/animated_preview.tscn" id="2_preview"]
+[ext_resource type="Script" path="res://addons/anim_sheet/components/animation_name_cell.gd" id="1_cell"]
+[ext_resource type="PackedScene" path="res://addons/anim_sheet/components/animated_preview.tscn" id="2_preview"]
 
 [node name="AnimationNameCell" type="VBoxContainer"]
 custom_minimum_size = Vector2(200, 250)

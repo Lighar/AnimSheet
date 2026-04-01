@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://cftsqe15cvpqx"]
 
-[ext_resource type="Script" uid="uid://ctqtbr7tc0vf" path="res://addons/tiled_image_scanner/components/animated_preview.gd" id="1_w7r3h"]
+[ext_resource type="Script" uid="uid://ctqtbr7tc0vf" path="res://addons/anim_sheet/components/animated_preview.gd" id="1_w7r3h"]
 
 [node name="AnimatedPreview" type="Control" unique_id=2001227308]
 layout_mode = 3

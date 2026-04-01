@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://c8ykgn6f2g7pk"]
 
-[ext_resource type="Script" path="res://addons/tiled_image_scanner/components/info_item.gd" id="1"]
+[ext_resource type="Script" path="res://addons/anim_sheet/components/info_item.gd" id="1"]
 
 [node name="InfoItem" type="HBoxContainer"]
 script = ExtResource("1")

@@ -2,8 +2,8 @@
 extends RefCounted
 class_name InfoPanel
 
-const InfoHeaderScene = preload("res://addons/tiled_image_scanner/components/info_header.tscn")
-const InfoItemScene = preload("res://addons/tiled_image_scanner/components/info_item.tscn")
+const InfoHeaderScene = preload("res://addons/anim_sheet/components/info_header.tscn")
+const InfoItemScene = preload("res://addons/anim_sheet/components/info_item.tscn")
 
 var panel: VBoxContainer
 var theme_owner: Control

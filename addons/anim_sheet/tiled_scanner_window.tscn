@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://cm3w2xo4j76e7"]
 
-[ext_resource type="Script" uid="uid://rvedufe7j2ot" path="res://addons/tiled_image_scanner/tiled_scanner_window.gd" id="1"]
-[ext_resource type="Texture2D" uid="uid://cdmxhl77nvgxg" path="res://addons/tiled_image_scanner/icon.svg" id="2_w3u2a"]
-[ext_resource type="Texture2D" uid="uid://c57l6vq7osd4s" path="res://addons/tiled_image_scanner/github_icon.svg" id="3_github"]
+[ext_resource type="Script" uid="uid://rvedufe7j2ot" path="res://addons/anim_sheet/tiled_scanner_window.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://cdmxhl77nvgxg" path="res://addons/anim_sheet/icon.svg" id="2_w3u2a"]
+[ext_resource type="Texture2D" uid="uid://c57l6vq7osd4s" path="res://addons/anim_sheet/github_icon.svg" id="3_github"]
 
 [node name="TiledScannerWindow" type="Control" unique_id=1309302026]
 layout_mode = 3

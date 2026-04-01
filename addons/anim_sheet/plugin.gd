@@ -4,7 +4,7 @@ extends EditorPlugin
 var main_panel: Control
 
 func _enter_tree() -> void:
-	main_panel = preload("res://addons/tiled_image_scanner/tiled_scanner_window.tscn").instantiate()
+	main_panel = preload("res://addons/anim_sheet/tiled_scanner_window.tscn").instantiate()
 	get_editor_interface().get_editor_main_screen().add_child(main_panel)
 	_make_visible(false)
 

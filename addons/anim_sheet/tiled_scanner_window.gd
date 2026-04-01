@@ -220,7 +220,7 @@ func _update_info_panel(metadata: Dictionary, is_folder: bool) -> void:
 func _add_animated_preview(img_data: Dictionary) -> void:
 	current_preview_widget = null
 
-	var preview_scene := preload("res://addons/tiled_image_scanner/components/animation_preview_container.tscn")
+	var preview_scene := preload("res://addons/anim_sheet/components/animation_preview_container.tscn")
 	var preview_container = preview_scene.instantiate()
 
 	if preview_container.setup(img_data.path, img_data, is_horizontal, fps):

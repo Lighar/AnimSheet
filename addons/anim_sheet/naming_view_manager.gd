@@ -2,7 +2,7 @@
 extends RefCounted
 class_name NamingViewManager
 
-const AnimationNameCellScene = preload("res://addons/tiled_image_scanner/components/animation_name_cell.tscn")
+const AnimationNameCellScene = preload("res://addons/anim_sheet/components/animation_name_cell.tscn")
 
 var scan_view: Control
 var naming_view: Control
