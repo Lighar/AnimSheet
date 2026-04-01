@@ -11,7 +11,7 @@
 
 ## ✨ What's New in V2
 
-AnimSheet V2 is a **complete rewrite** focused on batch processing workflows. If you've used V1, you'll notice this version takes a different approach - it's all about handling multiple sprite sheets efficiently in one go.
+AnimSheet V2 is a **complete rewrite** from scratch focused on batch processing workflows. If you've used V1, you'll notice this version takes a different approach handling multiple sprite sheets efficiently in one go.
 
 **V2 brings you:**
 - 📦 **Batch scanning** - Process folders or ZIP archives full of sprite sheets
