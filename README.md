@@ -3,7 +3,7 @@
 
 **Batch process your sprite sheets like a pro.** Scan entire folders or ZIP archives, detect grids automatically, and export ready-to-use AnimatedSprite2D or AnimationPlayer nodes with custom naming.
 
-![Selection View](images/selection.gif)
+![Selection View](images/main.gif)
 
 **SpriteSheet Source:** [Zerie Tiny RPG Pack](https://zerie.itch.io/tiny-rpg-character-asset-pack)
 
@@ -31,10 +31,12 @@ Stop importing sprite sheets one at a time! Load an entire folder or ZIP archive
 - Scan folders recursively, identify spritesheets among all files.
 - Extract and process ZIP archives on the fly
 
-![Preview](images/multiplepreview.gif)
+![Preview](images/selection.gif)
 
 ### Smart Grid Detection
 AnimSheet analyzes your sprite sheets using frequency-based column and row detection to find consistent tile patterns.
+
+![Preview](images/multiple_preview.gif)
 
 ### Custom Naming System
 Give your animations meaningful names before export:
