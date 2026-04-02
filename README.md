@@ -17,9 +17,8 @@ AnimSheet V2 is a **complete rewrite** from scratch focused on batch processing 
 - 📦 **Batch scanning** - Process folders or ZIP archives full of sprite sheets
 - 🔍 **Automatic grid detection** - Frequency-based analysis finds tile sizes for you
 - 🎨 **Custom naming workflow** - Name your animations before export
-- 🚀 **Streamlined export** - Choose AnimatedSprite2D or AnimationPlayer output
 
-**Important:** V2 doesn't allow manual drag and select currently. If you need the original V1 with manual frame selection, check out the V1 branch.
+**Important:** V2 doesn't allow manual drag and select currently. If you need the original V1 with manual frame selection, check out the V1 branch. I will try to add it in the future.
 
 ---
 
@@ -49,6 +48,8 @@ Give your animations meaningful names before export:
 **🎬 AnimatedSprite2D** 
 
 ![AnimatedSprite2D Output](images/animatedsprite.png)
+
+Possible thanks to cenairaclub implementation in V1 !
 
 **🎮 AnimationPlayer**
 
