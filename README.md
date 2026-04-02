@@ -63,11 +63,9 @@ Get a Sprite2D + AnimationPlayer pair for advanced animation control and scripti
 
 ## 📥 Installation
 
-### From Asset Library (Recommended)
-1. Open Godot and head to the **AssetLib** tab
-2. Search for **AnimSheet**
-3. Download and install
-4. Enable it in **Project → Project Settings → Plugins**
+### From Asset Library 
+Not available yet for V2
+
 
 ### Manual Installation
 1. Grab the `addons/anim_sheet` folder from this repo
