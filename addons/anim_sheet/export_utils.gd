@@ -25,7 +25,6 @@ static func extract_animation_frames(img: Image, img_data: Dictionary, is_horizo
 	var rows: int = img_data.rows
 	var columns: int = img_data.columns
 	
-	
 	if is_horizontal:
 		for row in range(rows):
 			var frame_rects: Array[Rect2] = []
@@ -156,7 +155,7 @@ static func _merge_images_into_sheet(selected_items: Array) -> Dictionary:
 		"image_infos": image_infos
 	}
 
-static func export_to_animation_player(selected_items: Array, fps: int, is_horizontal: bool, scene_root: Node, node_name: String, animation_mappings: Dictionary, animations_data: Array = []) -> AnimationPlayer:
+static func export_to_animation_player(selected_items: Array, fps: int, scene_root: Node, node_name: String, animation_mappings: Dictionary, animations_data: Array = []) -> AnimationPlayer:
 	var merged_data := _merge_images_into_sheet(selected_items)
 	if merged_data.is_empty():
 		return null
@@ -172,22 +171,16 @@ static func export_to_animation_player(selected_items: Array, fps: int, is_horiz
 	sprite.vframes = merged_data.rows
 	sprite.frame_coords = Vector2i.ZERO
 	
-
-	
-	
 	var anim_player = AnimationPlayer.new()
 	anim_player.name = "AnimationPlayer"
-	
 	
 	scene_root.add_child(sprite)
 	sprite.owner = scene_root
 	sprite.add_child(anim_player)
 	anim_player.owner = scene_root
 	
-	
 	var anim_library = AnimationLibrary.new()
 	var frame_duration := 1.0 / float(fps) if fps > 0 else 0.1
-	
 	
 	if animations_data.size() > 0:
 		for anim_data in animations_data:
@@ -201,17 +194,14 @@ static func export_to_animation_player(selected_items: Array, fps: int, is_horiz
 			anim.track_set_path(track_idx, NodePath(".:frame_coords"))
 			anim.value_track_set_update_mode(track_idx, Animation.UPDATE_DISCRETE)
 			
-			
 			var frame_time := 0.0
 			var img_data: Dictionary = anim_data.img_data
 			var start_row: int = 0
-			
 			
 			for info in merged_data.image_infos:
 				if info.data == img_data:
 					start_row = info.start_row
 					break
-			
 			
 			for frame_rect in anim_data.frame_rects:
 				
@@ -230,28 +220,22 @@ static func export_to_animation_player(selected_items: Array, fps: int, is_horiz
 	
 	return anim_player
 
-static func export_to_animated_sprite(selected_items: Array, fps: int, is_horizontal: bool, scene_root: Node, node_name: String, animation_mappings: Dictionary, animations_data: Array = []) -> AnimatedSprite2D:
+static func export_to_animated_sprite(selected_items: Array, fps: int, scene_root: Node, node_name: String, animation_mappings: Dictionary, animations_data: Array = []) -> AnimatedSprite2D:
 	var merged_data := _merge_images_into_sheet(selected_items)
 	if merged_data.is_empty():
 		return null
-	
 	
 	var texture := ImageTexture.create_from_image(merged_data.image)
 	if not texture:
 		return null
 	
-	
 	var animated_sprite = AnimatedSprite2D.new()
 	animated_sprite.name = node_name
-	
-
-	
 	
 	var sprite_frames = SpriteFrames.new()
 	
 	var cell_width: int = merged_data.cell_width
 	var cell_height: int = merged_data.cell_height
-	
 	
 	if animations_data.size() > 0:
 		for anim_data in animations_data:
@@ -267,12 +251,10 @@ static func export_to_animated_sprite(selected_items: Array, fps: int, is_horizo
 			var img_data: Dictionary = anim_data.img_data
 			var start_row: int = 0
 			
-			
 			for info in merged_data.image_infos:
 				if info.data == img_data:
 					start_row = info.start_row
 					break
-			
 			
 			for frame_rect in anim_data.frame_rects:
 				
@@ -289,11 +271,9 @@ static func export_to_animated_sprite(selected_items: Array, fps: int, is_horizo
 	
 	animated_sprite.sprite_frames = sprite_frames
 	
-	
 	var anim_names = sprite_frames.get_animation_names()
 	if not anim_names.is_empty():
 		animated_sprite.animation = anim_names[0]
-	
 	
 	scene_root.add_child(animated_sprite)
 	animated_sprite.owner = scene_root

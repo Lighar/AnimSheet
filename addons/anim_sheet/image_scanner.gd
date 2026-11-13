@@ -107,15 +107,3 @@ func extract_zip(zip_path: String, extract_to: String) -> bool:
 	
 	reader.close()
 	return has_images
-
-func get_relative_path(full_path: String, base_path: String) -> String:
-	if base_path.is_empty():
-		return full_path.get_file()
-	
-	if full_path.begins_with(base_path):
-		var relative := full_path.substr(base_path.length())
-		if relative.begins_with("/"):
-			relative = relative.substr(1)
-		return relative
-	
-	return full_path.get_file()
