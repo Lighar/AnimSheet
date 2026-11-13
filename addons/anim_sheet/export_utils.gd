@@ -25,7 +25,6 @@ static func extract_animation_frames(img: Image, img_data: Dictionary, is_horizo
 	var rows: int = img_data.rows
 	var columns: int = img_data.columns
 	
-	#print("  Cell: %dx%d, Offset: (%d,%d), Grid: %dx%d" % [cell_width, cell_height, offset_x, offset_y, columns, rows])
 	
 	if is_horizontal:
 		for row in range(rows):
@@ -38,7 +37,6 @@ static func extract_animation_frames(img: Image, img_data: Dictionary, is_horizo
 					var is_empty = _is_frame_empty(img, x, y, cell_width, cell_height)
 					if not is_empty:
 						frame_rects.append(Rect2(x, y, cell_width, cell_height))
-			#print("  Row %d: %d frames" % [row, frame_rects.size()])
 			if frame_rects.size() > 0:
 				all_animations.append(frame_rects)
 	else:
