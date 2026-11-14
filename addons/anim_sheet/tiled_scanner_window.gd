@@ -135,8 +135,7 @@ func _on_folder_selected(path: String) -> void:
 # ============================================================
 
 func _extract_and_scan() -> void:
-	extracted_path = "user://temp_extract_" + str(Time.get_ticks_msec())
-	DirAccess.make_dir_absolute(extracted_path)
+	extracted_path = ImageScanner.make_temp_dir()
 
 	if not image_scanner.extract_zip(current_zip_path, extracted_path):
 		status_label.text = "Error: Failed to open ZIP file"

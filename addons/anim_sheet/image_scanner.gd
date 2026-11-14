@@ -113,15 +113,28 @@ func extract_zip(zip_path: String, extract_to: String) -> bool:
 	return has_images
 
 static func remove_dir_recursive(path: String) -> void:
-	for d in DirAccess.get_directories_at(path):
+	var dir := DirAccess.open(path)
+	if not dir:
+		return
+	dir.include_hidden = true
+	for d in dir.get_directories():
 		remove_dir_recursive(path.path_join(d))
-	for f in DirAccess.get_files_at(path):
-		DirAccess.remove_absolute(path.path_join(f))
+	for f in dir.get_files():
+		dir.remove(f)
 	DirAccess.remove_absolute(path)
 
-## Deletes every user://temp_extract_* folder except `keep`.
+const TEMP_MARKER := ".animsheet_temp"
+
+static func make_temp_dir() -> String:
+	var path := "user://temp_extract_" + str(Time.get_ticks_msec())
+	DirAccess.make_dir_absolute(path)
+	var f := FileAccess.open(path.path_join(TEMP_MARKER), FileAccess.WRITE)
+	if f: f.close()
+	return path
+
 static func clear_temp_dirs(keep: String = "") -> void:
 	for d in DirAccess.get_directories_at("user://"):
 		var path := "user://" + d
-		if d.begins_with("temp_extract_") and path != keep:
+		if d.begins_with("temp_extract_") and path != keep \
+				and FileAccess.file_exists(path.path_join(TEMP_MARKER)):
 			remove_dir_recursive(path)
