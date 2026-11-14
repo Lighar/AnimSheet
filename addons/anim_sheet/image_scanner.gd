@@ -87,13 +87,17 @@ func extract_zip(zip_path: String, extract_to: String) -> bool:
 	var files := reader.get_files()
 	var has_images := false
 	
-	for file_path in files:
+	for entry in files:
+		var file_path := entry.replace("\\", "/").simplify_path()
 		var ext := file_path.get_extension().to_lower()
 		if ext not in ["png", "jpg", "jpeg", "bmp", "webp"]:
 			continue
+		if file_path.is_absolute_path() or file_path.begins_with(".."):
+			push_warning("AnimSheet: skipped unsafe zip entry: " + entry)
+			continue
 		
 		has_images = true
-		var file_data := reader.read_file(file_path)
+		var file_data := reader.read_file(entry)
 		var target_path := extract_to.path_join(file_path)
 		var target_dir := target_path.get_base_dir()
 		
@@ -107,3 +111,17 @@ func extract_zip(zip_path: String, extract_to: String) -> bool:
 	
 	reader.close()
 	return has_images
+
+static func remove_dir_recursive(path: String) -> void:
+	for d in DirAccess.get_directories_at(path):
+		remove_dir_recursive(path.path_join(d))
+	for f in DirAccess.get_files_at(path):
+		DirAccess.remove_absolute(path.path_join(f))
+	DirAccess.remove_absolute(path)
+
+## Deletes every user://temp_extract_* folder except `keep`.
+static func clear_temp_dirs(keep: String = "") -> void:
+	for d in DirAccess.get_directories_at("user://"):
+		var path := "user://" + d
+		if d.begins_with("temp_extract_") and path != keep:
+			remove_dir_recursive(path)

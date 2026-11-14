@@ -45,6 +45,7 @@ var naming_view_manager: NamingViewManager = null
 # ============================================================
 
 func _ready() -> void:
+	ImageScanner.clear_temp_dirs()
 	image_scanner = ImageScanner.new()
 	tree_manager = TreeManager.new(tree)
 	info_panel_manager = InfoPanel.new(info_panel, self)
@@ -82,6 +83,9 @@ func _ready() -> void:
 
 	tree_manager.setup()
 	_show_info_placeholder()
+
+func _exit_tree() -> void:
+	ImageScanner.clear_temp_dirs()
 
 # ============================================================
 # GITHUB
@@ -136,8 +140,10 @@ func _extract_and_scan() -> void:
 
 	if not image_scanner.extract_zip(current_zip_path, extracted_path):
 		status_label.text = "Error: Failed to open ZIP file"
+		ImageScanner.remove_dir_recursive(extracted_path)
 		return
 
+	ImageScanner.clear_temp_dirs(extracted_path)
 	_scan_images()
 
 func _scan_images() -> void:
