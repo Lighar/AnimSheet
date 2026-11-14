@@ -17,82 +17,54 @@ static func _is_frame_empty(img: Image, x: int, y: int, width: int, height: int)
 
 static func extract_animation_frames(img: Image, img_data: Dictionary, is_horizontal: bool) -> Array[Array]:
 	var all_animations: Array[Array] = []
-	
-	var cell_width: int = img_data.cell_width
-	var cell_height: int = img_data.cell_height
-	var offset_x: int = img_data.offset_x
-	var offset_y: int = img_data.offset_y
-	var rows: int = img_data.rows
-	var columns: int = img_data.columns
-	
-	if is_horizontal:
-		for row in range(rows):
-			var frame_rects: Array[Rect2] = []
-			for col in range(columns):
-				var x: int = offset_x + col * cell_width
-				var y: int = offset_y + row * cell_height
-				
-				if x >= 0 and y >= 0 and x + cell_width <= img.get_width() and y + cell_height <= img.get_height():
-					var is_empty = _is_frame_empty(img, x, y, cell_width, cell_height)
-					if not is_empty:
-						frame_rects.append(Rect2(x, y, cell_width, cell_height))
-			if frame_rects.size() > 0:
-				all_animations.append(frame_rects)
-	else:
-		for col in range(columns):
-			var frame_rects: Array[Rect2] = []
-			for row in range(rows):
-				var x: int = offset_x + col * cell_width
-				var y: int = offset_y + row * cell_height
-				
-				if x >= 0 and y >= 0 and x + cell_width <= img.get_width() and y + cell_height <= img.get_height():
-					if not _is_frame_empty(img, x, y, cell_width, cell_height):
-						frame_rects.append(Rect2(x, y, cell_width, cell_height))
-			if frame_rects.size() > 0:
-				all_animations.append(frame_rects)
-	
+	var cw: int = img_data.cell_width
+	var ch: int = img_data.cell_height
+	var outer: int = img_data.rows if is_horizontal else img_data.columns
+	var inner: int = img_data.columns if is_horizontal else img_data.rows
+
+	for i in range(outer):
+		var frame_rects: Array[Rect2] = []
+		for j in range(inner):
+			var col := j if is_horizontal else i
+			var row := i if is_horizontal else j
+			var x: int = img_data.offset_x + col * cw
+			var y: int = img_data.offset_y + row * ch
+			if x >= 0 and y >= 0 and x + cw <= img.get_width() and y + ch <= img.get_height() \
+					and not _is_frame_empty(img, x, y, cw, ch):
+				frame_rects.append(Rect2(x, y, cw, ch))
+		if not frame_rects.is_empty():
+			all_animations.append(frame_rects)
+
 	return all_animations
 
 static func build_animation_list(selected_items: Array, is_horizontal: bool) -> Array[Dictionary]:
 	var animations: Array[Dictionary] = []
-	
+
 	for img_data in selected_items:
 		var base_name: String = img_data.filename.get_basename()
-		
+
 		var img := Image.new()
 		if img.load(img_data.path) != OK:
+			push_warning("AnimSheet: skipped unreadable image: " + str(img_data.path))
 			continue
-		
+
 		var all_frame_rects := extract_animation_frames(img, img_data, is_horizontal)
 		var anim_count := all_frame_rects.size()
-		
-		if is_horizontal:
-			for row in range(anim_count):
-				var frame_rects: Array[Rect2] = []
-				frame_rects.assign(all_frame_rects[row])
-				var anim_name := base_name if anim_count == 1 else base_name + "_row_%d" % row
-				animations.append({
-					"original_name": anim_name,
-					"display_name": anim_name,
-					"img_data": img_data,
-					"row": row,
-					"col": -1,
-					"frame_rects": frame_rects
-				})
-		else:
-			for col in range(anim_count):
-				var frame_rects: Array[Rect2] = []
-				frame_rects.assign(all_frame_rects[col])
-				var anim_name := base_name if anim_count == 1 else base_name + "_col_%d" % col
-				animations.append({
-					"original_name": anim_name,
-					"display_name": anim_name,
-					"img_data": img_data,
-					"row": -1,
-					"col": col,
-					"frame_rects": frame_rects
-				})
-	
+
+		for i in range(anim_count):
+			var frame_rects: Array[Rect2] = []
+			frame_rects.assign(all_frame_rects[i])
+			var suffix := "_row_%d" if is_horizontal else "_col_%d"
+			var anim_name := base_name if anim_count == 1 else base_name + suffix % i
+			animations.append({
+				"original_name": anim_name,
+				"display_name": anim_name,
+				"img_data": img_data,
+				"row": i if is_horizontal else -1,
+				"col": -1 if is_horizontal else i,
+				"frame_rects": frame_rects
+			})
+
 	return animations
 
 static func _merge_images_into_sheet(selected_items: Array) -> Dictionary:
@@ -107,6 +79,7 @@ static func _merge_images_into_sheet(selected_items: Array) -> Dictionary:
 	for img_data in selected_items:
 		var img := Image.new()
 		if img.load(img_data.path) != OK:
+			push_warning("AnimSheet: skipped unreadable image: " + str(img_data.path))
 			continue
 		
 		max_cell_width = max(max_cell_width, img_data.cell_width)

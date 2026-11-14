@@ -106,7 +106,6 @@ static func build_projections(img: Image) -> Array:
 	var col_proj := PackedInt32Array(); col_proj.resize(img_width);  col_proj.fill(0)
 	var row_proj := PackedInt32Array(); row_proj.resize(img_height); row_proj.fill(0)
 
-	var total_active := 0
 	for y in range(img_height):
 		for x in range(img_width):
 			var pixel  := img.get_pixel(x, y)
@@ -118,7 +117,6 @@ static func build_projections(img: Image) -> Array:
 			if active:
 				row_proj[y] += 1
 				col_proj[x] += 1
-				total_active += 1
 
 	return [col_proj, row_proj]
 
@@ -150,9 +148,3 @@ static func detect(img: Image) -> Dictionary:
 		offset_x    = cx if cw != null else 0,
 		offset_y    = cy if ch != null else 0,
 	}
-
-static func packed_max(arr: PackedInt32Array) -> int:
-	var m := 0
-	for v in arr:
-		if v > m: m = v
-	return m
