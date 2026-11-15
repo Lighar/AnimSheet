@@ -129,6 +129,7 @@ static func _merge_images_into_sheet(selected_items: Array) -> Dictionary:
 		return {}
 	
 	# Widest sheet choosed
+	var columns := 0
 	for info in image_infos:
 		columns = max(columns, info.data.columns)
 
