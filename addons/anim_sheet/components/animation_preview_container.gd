@@ -1,8 +1,6 @@
 @tool
 extends VBoxContainer
 
-signal animation_changed(index: int)
-
 @onready var prev_btn: Button = $SelectorContainer/PrevButton
 @onready var anim_label: Label = $SelectorContainer/AnimLabel
 @onready var next_btn: Button = $SelectorContainer/NextButton
@@ -60,13 +58,11 @@ func _on_prev_pressed() -> void:
 	if current_index > 0:
 		current_index -= 1
 		_update_display()
-		animation_changed.emit(current_index)
 
 func _on_next_pressed() -> void:
 	if current_index < all_animations.size() - 1:
 		current_index += 1
 		_update_display()
-		animation_changed.emit(current_index)
 
 func _start_timer(fps: int) -> void:
 	if timer:
@@ -88,9 +84,6 @@ func _exit_tree() -> void:
 		timer.stop()
 		timer.queue_free()
 		timer = null
-
-func get_current_index() -> int:
-	return current_index
 
 func get_animation_count() -> int:
 	return all_animations.size()

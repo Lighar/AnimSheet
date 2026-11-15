@@ -87,13 +87,17 @@ func extract_zip(zip_path: String, extract_to: String) -> bool:
 	var files := reader.get_files()
 	var has_images := false
 	
-	for file_path in files:
+	for entry in files:
+		var file_path := entry.replace("\\", "/").simplify_path()
 		var ext := file_path.get_extension().to_lower()
 		if ext not in ["png", "jpg", "jpeg", "bmp", "webp"]:
 			continue
+		if file_path.is_absolute_path() or file_path.begins_with(".."):
+			push_warning("AnimSheet: skipped unsafe zip entry: " + entry)
+			continue
 		
 		has_images = true
-		var file_data := reader.read_file(file_path)
+		var file_data := reader.read_file(entry)
 		var target_path := extract_to.path_join(file_path)
 		var target_dir := target_path.get_base_dir()
 		
@@ -108,14 +112,29 @@ func extract_zip(zip_path: String, extract_to: String) -> bool:
 	reader.close()
 	return has_images
 
-func get_relative_path(full_path: String, base_path: String) -> String:
-	if base_path.is_empty():
-		return full_path.get_file()
-	
-	if full_path.begins_with(base_path):
-		var relative := full_path.substr(base_path.length())
-		if relative.begins_with("/"):
-			relative = relative.substr(1)
-		return relative
-	
-	return full_path.get_file()
+static func remove_dir_recursive(path: String) -> void:
+	var dir := DirAccess.open(path)
+	if not dir:
+		return
+	dir.include_hidden = true
+	for d in dir.get_directories():
+		remove_dir_recursive(path.path_join(d))
+	for f in dir.get_files():
+		dir.remove(f)
+	DirAccess.remove_absolute(path)
+
+const TEMP_MARKER := ".animsheet_temp"
+
+static func make_temp_dir() -> String:
+	var path := "user://temp_extract_" + str(Time.get_ticks_msec())
+	DirAccess.make_dir_absolute(path)
+	var f := FileAccess.open(path.path_join(TEMP_MARKER), FileAccess.WRITE)
+	if f: f.close()
+	return path
+
+static func clear_temp_dirs(keep: String = "") -> void:
+	for d in DirAccess.get_directories_at("user://"):
+		var path := "user://" + d
+		if d.begins_with("temp_extract_") and path != keep \
+				and FileAccess.file_exists(path.path_join(TEMP_MARKER)):
+			remove_dir_recursive(path)

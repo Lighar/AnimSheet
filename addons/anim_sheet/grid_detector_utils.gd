@@ -1,12 +1,10 @@
 class_name GridDetectorUtils
 
-
 static func get_median(lst: Array) -> float:
 	if lst.is_empty(): return 0.0
 	var s := lst.duplicate(); s.sort()
 	var mid := s.size() / 2
 	return (s[mid - 1] + s[mid]) / 2.0 if s.size() % 2 == 0 else float(s[mid])
-
 
 static func get_prominence(arr: Array, peak_idx: int) -> float:
 	var pv: float = arr[peak_idx]
@@ -19,7 +17,6 @@ static func get_prominence(arr: Array, peak_idx: int) -> float:
 		if arr[j] > pv: break
 		if arr[j] < rm: rm = arr[j]
 	return pv - maxf(lm, rm)
-
 
 static func get_base_spacing(projection: PackedInt32Array, label: String = "", min_size: int = 8) -> Variant:
 	var n := projection.size()
@@ -40,7 +37,6 @@ static func get_base_spacing(projection: PackedInt32Array, label: String = "", m
 
 	var max_val: float = autocorr.max()
 	if max_val == 0.0:
-		#print("GridDetectorUtils [%s]: autocorr flat." % label)
 		return null
 
 	var pt := max_val * 0.1
@@ -60,8 +56,6 @@ static func get_base_spacing(projection: PackedInt32Array, label: String = "", m
 	for p in raw_peaks:
 		if get_prominence(autocorr, p) >= pt: prominent.append(p)
 
-	#print("GridDetectorUtils [%s]: raw=%d  prominent=%d" % [label, raw_peaks.size(), prominent.size()])
-
 	prominent.sort_custom(func(a, b): return autocorr[a] > autocorr[b])
 	var peaks: Array = []
 	for p in prominent:
@@ -71,15 +65,12 @@ static func get_base_spacing(projection: PackedInt32Array, label: String = "", m
 		if ok: peaks.append(p)
 	peaks.sort()
 
-	#print("GridDetectorUtils [%s]: peaks = %s" % [label, str(peaks)])
-
 	if not peaks.is_empty():
 		var wz := [0] + peaks
 		var diffs: Array = []
 		for idx in range(1, wz.size()): diffs.append(wz[idx] - wz[idx - 1])
 		return int(get_median(diffs))
 	return null
-
 
 static func optimize_grid(projection: PackedInt32Array, approx: Variant, total: int) -> Array:
 	if approx == null: return [null, 0]
@@ -106,7 +97,6 @@ static func optimize_grid(projection: PackedInt32Array, approx: Variant, total: 
 			best_off = found_offset if found_offset >= 0 else 0  # Ensure non-negative
 	return [best_t, best_off]
 
-
 static func build_projections(img: Image) -> Array:
 	## Returns [col_proj: PackedInt32Array, row_proj: PackedInt32Array]
 	var img_width  := img.get_width()
@@ -116,7 +106,6 @@ static func build_projections(img: Image) -> Array:
 	var col_proj := PackedInt32Array(); col_proj.resize(img_width);  col_proj.fill(0)
 	var row_proj := PackedInt32Array(); row_proj.resize(img_height); row_proj.fill(0)
 
-	var total_active := 0
 	for y in range(img_height):
 		for x in range(img_width):
 			var pixel  := img.get_pixel(x, y)
@@ -128,11 +117,8 @@ static func build_projections(img: Image) -> Array:
 			if active:
 				row_proj[y] += 1
 				col_proj[x] += 1
-				total_active += 1
 
-	#print("GridDetectorUtils: active=%d  col_max=%d  row_max=%d" % [total_active, packed_max(col_proj), packed_max(row_proj)])
 	return [col_proj, row_proj]
-
 
 static func detect(img: Image) -> Dictionary:
 	## Main entry: returns { cell_width, cell_height, offset_x, offset_y }
@@ -146,7 +132,6 @@ static func detect(img: Image) -> Dictionary:
 
 	var approx_w = get_base_spacing(col_proj, "col")
 	var approx_h = get_base_spacing(row_proj, "row")
-	#print("GridDetectorUtils: approx  w=%s  h=%s" % [str(approx_w), str(approx_h)])
 
 	var result_w := optimize_grid(col_proj, approx_w, img_width)
 	var result_h := optimize_grid(row_proj, approx_h, img_height)
@@ -163,10 +148,3 @@ static func detect(img: Image) -> Dictionary:
 		offset_x    = cx if cw != null else 0,
 		offset_y    = cy if ch != null else 0,
 	}
-
-
-static func packed_max(arr: PackedInt32Array) -> int:
-	var m := 0
-	for v in arr:
-		if v > m: m = v
-	return m

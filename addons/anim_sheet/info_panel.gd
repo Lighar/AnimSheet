@@ -48,7 +48,7 @@ func display_image_info(img_data: Dictionary, direction: int, actual_anim_count:
 	
 	if actual_anim_count > 0:
 		var direction_text := "row" if is_horizontal else "column"
-		add_item("Count", "%d %ss)" % [actual_anim_count, direction_text], "Animation", Color(1.0, 0.7, 0.9))
+		add_item("Count", "%d %s(s)" % [actual_anim_count, direction_text], "Animation", Color(1.0, 0.7, 0.9))
 
 func add_header(text: String, icon_name: String) -> void:
 	var header = InfoHeaderScene.instantiate()

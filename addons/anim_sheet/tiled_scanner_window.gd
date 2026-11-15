@@ -29,10 +29,6 @@ var extracted_path: String = ""
 # -- Scan results --
 var scanned_images: Array[Dictionary] = []
 var scanned_images_by_path: Dictionary = {}  # path -> img_data for O(1) lookup
-var current_selected_image: Dictionary = {}
-
-# -- Preview --
-var current_preview_widget = null
 
 # -- Animation settings --
 var fps: int = 10
@@ -49,6 +45,7 @@ var naming_view_manager: NamingViewManager = null
 # ============================================================
 
 func _ready() -> void:
+	ImageScanner.clear_temp_dirs()
 	image_scanner = ImageScanner.new()
 	tree_manager = TreeManager.new(tree)
 	info_panel_manager = InfoPanel.new(info_panel, self)
@@ -84,11 +81,11 @@ func _ready() -> void:
 	direction_option.selected = 0 if is_horizontal else 1
 	direction_option.item_selected.connect(_on_animation_settings_changed)
 
-	_setup_tree()
+	tree_manager.setup()
 	_show_info_placeholder()
 
-func _setup_tree() -> void:
-	tree_manager.setup()
+func _exit_tree() -> void:
+	ImageScanner.clear_temp_dirs()
 
 # ============================================================
 # GITHUB
@@ -138,13 +135,14 @@ func _on_folder_selected(path: String) -> void:
 # ============================================================
 
 func _extract_and_scan() -> void:
-	extracted_path = "user://temp_extract_" + str(Time.get_ticks_msec())
-	DirAccess.make_dir_absolute(extracted_path)
+	extracted_path = ImageScanner.make_temp_dir()
 
 	if not image_scanner.extract_zip(current_zip_path, extracted_path):
 		status_label.text = "Error: Failed to open ZIP file"
+		ImageScanner.remove_dir_recursive(extracted_path)
 		return
 
+	ImageScanner.clear_temp_dirs(extracted_path)
 	_scan_images()
 
 func _scan_images() -> void:
@@ -155,25 +153,30 @@ func _scan_images() -> void:
 	status_label.text = "Found %d images, analyzing..." % image_files.size()
 	await get_tree().process_frame
 
+	var results: Array = []
+	results.resize(image_files.size())
+	if not image_files.is_empty():
+		var group_id := WorkerThreadPool.add_group_task(
+			func(i: int): results[i] = image_scanner.analyze_image(image_files[i]), image_files.size())
+		while not WorkerThreadPool.is_group_task_completed(group_id):
+			await get_tree().process_frame
+		WorkerThreadPool.wait_for_group_task_completion(group_id)
+
 	var tiled_count := 0
-	for img_path in image_files:
-		var result := image_scanner.analyze_image(img_path)
+	for result: Dictionary in results:
 		if not result.is_empty():
 			result["selected"] = false
 			scanned_images.append(result)
 			scanned_images_by_path[result.path] = result
 			tiled_count += 1
 
-	_populate_tree()
+	tree_manager.populate(scanned_images, extracted_path)
 
 	if tiled_count > 0:
 		status_label.text = "Found %d tiled images out of %d total" % [tiled_count, image_files.size()]
 		_update_export_buttons_state()
 	else:
 		status_label.text = "No tiled images found"
-
-func _populate_tree() -> void:
-	tree_manager.populate(scanned_images, extracted_path)
 
 # ============================================================
 # SELECTION & STATE SYNC
@@ -201,7 +204,6 @@ func _update_export_buttons_state() -> void:
 # ============================================================
 
 func _show_info_placeholder() -> void:
-	current_preview_widget = null
 	info_panel_manager.show_placeholder()
 
 func _update_info_panel(metadata: Dictionary, is_folder: bool) -> void:
@@ -213,12 +215,10 @@ func _update_info_panel(metadata: Dictionary, is_folder: bool) -> void:
 		var image_count := tree_manager.count_images_in_folder(folder_path)
 		info_panel_manager.display_folder_info(folder_path, image_count)
 	else:
-		current_selected_image = metadata
 		info_panel_manager.display_image_info(metadata, 0 if is_horizontal else 1)
 		_add_animated_preview(metadata)
 
 func _add_animated_preview(img_data: Dictionary) -> void:
-	current_preview_widget = null
 
 	var preview_scene := preload("res://addons/anim_sheet/components/animation_preview_container.tscn")
 	var preview_container = preview_scene.instantiate()
@@ -231,7 +231,6 @@ func _add_animated_preview(img_data: Dictionary) -> void:
 		info_panel_manager.display_image_info(img_data, 0 if is_horizontal else 1, actual_count)
 		
 		info_panel.add_child(preview_container)
-		current_preview_widget = preview_container.preview
 	else:
 		preview_container.queue_free()
 
@@ -254,11 +253,15 @@ func _on_animation_settings_changed(_value = null) -> void:
 # VALIDATION
 # ============================================================
 
-func _on_validate_pressed() -> void:
-	var selected_items: Array[Dictionary] = []
+func _get_selected_items() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
 	for img_data in scanned_images:
 		if img_data.get("selected", false):
-			selected_items.append(img_data)
+			result.append(img_data)
+	return result
+
+func _on_validate_pressed() -> void:
+	var selected_items := _get_selected_items()
 
 	if selected_items.is_empty():
 		status_label.text = "No images selected"
@@ -288,10 +291,7 @@ func _prepare_export_data() -> Dictionary:
 	var animation_mappings := naming_view_manager.get_animation_mappings()
 	var animations_data := naming_view_manager.get_animations_data()
 
-	var selected_items: Array[Dictionary] = []
-	for img_data in scanned_images:
-		if img_data.get("selected", false):
-			selected_items.append(img_data)
+	var selected_items := _get_selected_items()
 
 	if selected_items.is_empty():
 		status_label.text = "No images selected"
@@ -313,7 +313,7 @@ func _on_export_anim_player_pressed() -> void:
 		return
 
 	var anim_player := TiledImageExportUtils.export_to_animation_player(
-		export_data.selected_items, fps, is_horizontal, export_data.scene_root,
+		export_data.selected_items, fps, export_data.scene_root,
 		export_data.node_name, export_data.animation_mappings, export_data.animations_data
 	)
 
@@ -330,7 +330,7 @@ func _on_export_animated_sprite_pressed() -> void:
 		return
 
 	var animated_sprite := TiledImageExportUtils.export_to_animated_sprite(
-		export_data.selected_items, fps, is_horizontal, export_data.scene_root,
+		export_data.selected_items, fps, export_data.scene_root,
 		export_data.node_name, export_data.animation_mappings, export_data.animations_data
 	)
 
