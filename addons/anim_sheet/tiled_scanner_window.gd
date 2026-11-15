@@ -153,9 +153,17 @@ func _scan_images() -> void:
 	status_label.text = "Found %d images, analyzing..." % image_files.size()
 	await get_tree().process_frame
 
+	var results: Array = []
+	results.resize(image_files.size())
+	if not image_files.is_empty():
+		var group_id := WorkerThreadPool.add_group_task(
+			func(i: int): results[i] = image_scanner.analyze_image(image_files[i]), image_files.size())
+		while not WorkerThreadPool.is_group_task_completed(group_id):
+			await get_tree().process_frame
+		WorkerThreadPool.wait_for_group_task_completion(group_id)
+
 	var tiled_count := 0
-	for img_path in image_files:
-		var result := image_scanner.analyze_image(img_path)
+	for result: Dictionary in results:
 		if not result.is_empty():
 			result["selected"] = false
 			scanned_images.append(result)
