@@ -128,8 +128,10 @@ static func _merge_images_into_sheet(selected_items: Array) -> Dictionary:
 	if image_infos.is_empty():
 		return {}
 	
-	var columns: int = image_infos[0].data.columns
-	
+	# Widest sheet choosed
+	for info in image_infos:
+		columns = max(columns, info.data.columns)
+
 	var merged_width := max_cell_width * columns
 	var merged_height := max_cell_height * total_rows
 	var merged_img := Image.create(merged_width, merged_height, false, Image.FORMAT_RGBA8)
