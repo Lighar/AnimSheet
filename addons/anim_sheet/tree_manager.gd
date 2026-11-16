@@ -12,10 +12,10 @@ var is_horizontal := true
 
 func _init(tree_control: Tree):
 	tree = tree_control
-	tree.item_selected.connect(_on_item_selected)
+	tree.item_selected.connect(refresh_selection)
 	tree.item_edited.connect(_on_item_edited)
 
-func _on_item_selected() -> void:
+func refresh_selection() -> void:
 	var selected := tree.get_selected()
 	if not selected:
 		item_selected.emit({}, false)
@@ -87,82 +87,20 @@ func populate(images: Array[Dictionary], base_path: String, horizontal: bool) ->
 	tree_items.clear()
 	folder_items.clear()
 	var root := tree.create_item()
-	
-	var folder_structure := _build_folder_structure(images, base_path)
-	
-	for folder_path in folder_structure.keys():
-		if folder_path == "":
-			continue
-		_create_folder_tree_item(root, folder_path, folder_structure)
-
-func _build_folder_structure(images: Array[Dictionary], base_path: String) -> Dictionary:
-	var structure := {}
-	
 	for img_data in images:
 		var folder_path: String = img_data.path.trim_prefix(base_path).trim_prefix("/").get_base_dir()
-		
-		if folder_path == "":
-			folder_path = "."
-		
-		# Build all parent folders in the path
-		if folder_path != ".":
-			var parts := folder_path.split("/")
-			var current_path := ""
-			
-			for part in parts:
-				var parent_path := current_path
-				current_path = current_path.path_join(part) if current_path != "" else part
-				
-				if not structure.has(current_path):
-					structure[current_path] = {
-						"name": part,
-						"path": current_path,
-						"parent": parent_path,
-						"images": []
-					}
-		
-		if not structure.has(folder_path):
-			structure[folder_path] = {
-				"name": folder_path.get_file() if folder_path != "." else "Root",
-				"path": folder_path,
-				"parent": folder_path.get_base_dir(),
-				"images": []
-			}
-		
-		structure[folder_path]["images"].append(img_data)
-	
-	return structure
+		var folder := _get_folder_item(root, folder_path if folder_path != "" else ".")
+		var item := _create_checkable_item(folder, img_data.filename, "Image", img_data)
+		_add_animation_items(item, img_data)
+		tree_items[img_data.path] = item
 
-func _create_folder_tree_item(parent: TreeItem, folder_path: String, structure: Dictionary) -> TreeItem:
-	if folder_items.has(folder_path):
-		return folder_items[folder_path]
-	
-	if not structure.has(folder_path):
-		return parent
-	
-	var folder_data: Dictionary = structure[folder_path]
-	var parent_path: String = folder_data.get("parent", "")
-	
-	var actual_parent := parent
-	if parent_path != "" and structure.has(parent_path):
-		actual_parent = _create_folder_tree_item(parent, parent_path, structure)
-	
-	var folder_item := _create_checkable_item(actual_parent, folder_data.get("name", folder_path.get_file()),
-			"Folder", {"type": "folder", "path": folder_path})
-	
-	folder_items[folder_path] = folder_item
-	
-	for img_data in folder_data.images:
-		_create_image_tree_item(folder_item, img_data)
-	
-	return folder_item
-
-func _create_image_tree_item(parent: TreeItem, img_data: Dictionary) -> TreeItem:
-	var item := _create_checkable_item(parent, img_data.filename, "Image", img_data)
-	_add_animation_items(item, img_data)
-	
-	tree_items[img_data.path] = item
-	return item
+func _get_folder_item(root: TreeItem, folder_path: String) -> TreeItem:
+	if not folder_items.has(folder_path):
+		var parent_path := folder_path.get_base_dir()
+		var parent := _get_folder_item(root, parent_path) if parent_path != "" else root
+		var label := folder_path.get_file() if folder_path != "." else "Root"
+		folder_items[folder_path] = _create_checkable_item(parent, label, "Folder", {"type": "folder", "path": folder_path})
+	return folder_items[folder_path]
 
 func _add_animation_items(sheet_item: TreeItem, img_data: Dictionary) -> void:
 	var count: int = img_data.get("animation_hashes", {}).get(is_horizontal, []).size()

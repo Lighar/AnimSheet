@@ -226,7 +226,7 @@ func _on_animation_settings_changed(_value = null) -> void:
 	if horizontal != is_horizontal:
 		is_horizontal = horizontal
 		tree_manager.set_direction(is_horizontal)
-	tree_manager._on_item_selected()
+	tree_manager.refresh_selection()
 
 # ============================================================
 # VALIDATION
