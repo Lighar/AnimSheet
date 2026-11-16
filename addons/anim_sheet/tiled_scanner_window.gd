@@ -6,15 +6,18 @@ extends Control
 @onready var select_folder_button: Button = %SelectFolderButton
 @onready var tree: Tree = %Tree
 @onready var info_panel: VBoxContainer = %InfoPanel
-@onready var status_label: Label = %StatusLabel
 @onready var fps_spinbox: SpinBox = %FPSSpinBox
 @onready var direction_option: OptionButton = %DirectionOption
 @onready var validate_button: Button = %ValidateButton
+@onready var select_all_button: Button = %SelectAllButton
+@onready var select_none_button: Button = %SelectNoneButton
+@onready var selection_label: Label = %SelectionLabel
 
 # -- Naming view UI --
 @onready var scan_view: Control = %ScanView
 @onready var naming_view: Control = %NamingView
 @onready var node_name_edit: LineEdit = %NodeNameEdit
+@onready var animation_count_label: Label = %AnimationCountLabel
 @onready var animations_grid: GridContainer = %AnimationsGrid
 @onready var back_button: Button = %BackButton
 @onready var export_anim_player_button: Button = %ExportAnimPlayerButton
@@ -23,12 +26,10 @@ extends Control
 @onready var github_confirm_dialog: ConfirmationDialog = %GithubConfirmDialog
 
 # -- Source --
-var current_zip_path: String = ""
 var extracted_path: String = ""
 
 # -- Scan results --
 var scanned_images: Array[Dictionary] = []
-var scanned_images_by_path: Dictionary = {}  # path -> img_data for O(1) lookup
 
 # -- Animation settings --
 var fps: int = 10
@@ -49,40 +50,34 @@ func _ready() -> void:
 	image_scanner = ImageScanner.new()
 	tree_manager = TreeManager.new(tree)
 	info_panel_manager = InfoPanel.new(info_panel, self)
-	naming_view_manager = NamingViewManager.new(scan_view, naming_view, node_name_edit, animations_grid, self)
+	naming_view_manager = NamingViewManager.new(scan_view, naming_view, node_name_edit, animations_grid)
 
 	tree_manager.item_selected.connect(_update_info_panel)
-	tree_manager.item_edited.connect(_on_selection_changed)
+	tree_manager.selection_changed.connect(_on_selection_changed)
 	select_zip_button.pressed.connect(_on_select_zip_pressed)
 	select_folder_button.pressed.connect(_on_select_folder_pressed)
 	validate_button.pressed.connect(_on_validate_pressed)
+	select_all_button.pressed.connect(tree_manager.set_all_checked.bind(true))
+	select_none_button.pressed.connect(tree_manager.set_all_checked.bind(false))
 	back_button.pressed.connect(_on_back_pressed)
-	export_anim_player_button.pressed.connect(_on_export_anim_player_pressed)
-	export_animated_sprite_button.pressed.connect(_on_export_animated_sprite_pressed)
+	export_anim_player_button.pressed.connect(_on_export_pressed.bind(true))
+	export_animated_sprite_button.pressed.connect(_on_export_pressed.bind(false))
 	github_button.pressed.connect(_on_github_button_pressed)
 	github_confirm_dialog.confirmed.connect(_on_github_confirm)
 
-	validate_button.disabled = true
-	export_anim_player_button.disabled = true
-	export_animated_sprite_button.disabled = true
+	back_button.icon = get_theme_icon("Back", "EditorIcons")
+	export_anim_player_button.icon = get_theme_icon("AnimationPlayer", "EditorIcons")
+	export_animated_sprite_button.icon = get_theme_icon("AnimatedSprite2D", "EditorIcons")
 
-	scan_view.visible = true
-	naming_view.visible = false
-
-	fps_spinbox.min_value = 1
-	fps_spinbox.max_value = 60
-	fps_spinbox.value = fps
-	fps_spinbox.step = 1
 	fps_spinbox.value_changed.connect(_on_animation_settings_changed)
 
 	direction_option.clear()
 	direction_option.add_item("Horizontal (Row-based)", 0)
 	direction_option.add_item("Vertical (Column-based)", 1)
-	direction_option.selected = 0 if is_horizontal else 1
 	direction_option.item_selected.connect(_on_animation_settings_changed)
 
 	tree_manager.setup()
-	_show_info_placeholder()
+	info_panel_manager.show_placeholder()
 
 func _exit_tree() -> void:
 	ImageScanner.clear_temp_dirs()
@@ -106,7 +101,7 @@ func _on_select_zip_pressed() -> void:
 	file_dialog.file_mode = EditorFileDialog.FILE_MODE_OPEN_FILE
 	file_dialog.access = EditorFileDialog.ACCESS_FILESYSTEM
 	file_dialog.add_filter("*.zip", "ZIP Archives")
-	file_dialog.file_selected.connect(_on_zip_selected)
+	file_dialog.file_selected.connect(_extract_and_scan)
 	add_child(file_dialog)
 	file_dialog.popup_centered_ratio(0.6)
 
@@ -118,27 +113,19 @@ func _on_select_folder_pressed() -> void:
 	add_child(file_dialog)
 	file_dialog.popup_centered_ratio(0.6)
 
-func _on_zip_selected(path: String) -> void:
-	current_zip_path = path
-	status_label.text = "Selected: " + path.get_file() + " - Scanning..."
-	await get_tree().process_frame
-	_extract_and_scan()
-
 func _on_folder_selected(path: String) -> void:
 	extracted_path = path
-	status_label.text = "Selected folder: " + path.get_file() + " - Scanning..."
-	await get_tree().process_frame
 	_scan_images()
 
 # ============================================================
 # SCANNING
 # ============================================================
 
-func _extract_and_scan() -> void:
+func _extract_and_scan(zip_path: String) -> void:
 	extracted_path = ImageScanner.make_temp_dir()
 
-	if not image_scanner.extract_zip(current_zip_path, extracted_path):
-		status_label.text = "Error: Failed to open ZIP file"
+	if not image_scanner.extract_zip(zip_path, extracted_path):
+		push_error("AnimSheet: couldn't open %s, or it has no images." % zip_path)
 		ImageScanner.remove_dir_recursive(extracted_path)
 		return
 
@@ -147,11 +134,7 @@ func _extract_and_scan() -> void:
 
 func _scan_images() -> void:
 	scanned_images.clear()
-	scanned_images_by_path.clear()
 	var image_files := image_scanner.find_image_files(extracted_path)
-
-	status_label.text = "Found %d images, analyzing..." % image_files.size()
-	await get_tree().process_frame
 
 	var results: Array = []
 	results.resize(image_files.size())
@@ -162,49 +145,36 @@ func _scan_images() -> void:
 			await get_tree().process_frame
 		WorkerThreadPool.wait_for_group_task_completion(group_id)
 
-	var tiled_count := 0
 	for result: Dictionary in results:
 		if not result.is_empty():
-			result["selected"] = false
 			scanned_images.append(result)
-			scanned_images_by_path[result.path] = result
-			tiled_count += 1
 
-	tree_manager.populate(scanned_images, extracted_path)
+	TiledImageExportUtils.share_preview_rects(scanned_images)
+	tree_manager.populate(scanned_images, extracted_path, is_horizontal)
 
-	if tiled_count > 0:
-		status_label.text = "Found %d tiled images out of %d total" % [tiled_count, image_files.size()]
-		_update_export_buttons_state()
-	else:
-		status_label.text = "No tiled images found"
+	_update_export_buttons_state()
+	if scanned_images.is_empty():
+		push_warning("AnimSheet: no sprite sheets found in %d image(s)." % image_files.size())
 
 # ============================================================
 # SELECTION & STATE SYNC
 # ============================================================
 
-func _on_selection_changed(affected_paths: Array, is_checked: bool) -> void:
-	# Update all affected images using fast dictionary lookup
-	for path in affected_paths:
-		var img_data = scanned_images_by_path.get(path)
-		if img_data:
-			img_data.selected = is_checked
+func _on_selection_changed() -> void:
+	for img_data in scanned_images:
+		img_data.selected = tree_manager.is_sheet_selected(img_data.path)
+		img_data.anim_selection = tree_manager.checked_animations(img_data.path)
+	tree_manager.update_duplicate_warnings(scanned_images)
 	_update_export_buttons_state()
 
 func _update_export_buttons_state() -> void:
-	var has_selected := false
-	for img_data in scanned_images:
-		if img_data.get("selected", false):
-			has_selected = true
-			break
-
-	validate_button.disabled = not has_selected
+	var count := _get_selected_items().size()
+	validate_button.disabled = count == 0
+	selection_label.text = "%d / %d selected" % [count, scanned_images.size()]
 
 # ============================================================
 # INFO PANEL & PREVIEW
 # ============================================================
-
-func _show_info_placeholder() -> void:
-	info_panel_manager.show_placeholder()
 
 func _update_info_panel(metadata: Dictionary, is_folder: bool) -> void:
 	if metadata.is_empty():
@@ -215,24 +185,23 @@ func _update_info_panel(metadata: Dictionary, is_folder: bool) -> void:
 		var image_count := tree_manager.count_images_in_folder(folder_path)
 		info_panel_manager.display_folder_info(folder_path, image_count)
 	else:
-		info_panel_manager.display_image_info(metadata, 0 if is_horizontal else 1)
-		_add_animated_preview(metadata)
+		_show_image_info(metadata)
 
-func _add_animated_preview(img_data: Dictionary) -> void:
-
-	var preview_scene := preload("res://addons/anim_sheet/components/animation_preview_container.tscn")
-	var preview_container = preview_scene.instantiate()
-
-	if preview_container.setup(img_data.path, img_data, is_horizontal, fps):
-		# Get actual animation count from the preview
-		var actual_count = preview_container.get_animation_count()
-		
-		# Update info panel with correct count
-		info_panel_manager.display_image_info(img_data, 0 if is_horizontal else 1, actual_count)
-		
-		info_panel.add_child(preview_container)
-	else:
+func _show_image_info(img_data: Dictionary) -> void:
+	var preview_container = preload("res://addons/anim_sheet/components/animation_preview_container.tscn").instantiate()
+	if not preview_container.setup(img_data, is_horizontal, fps):
 		preview_container.queue_free()
+		info_panel_manager.display_image_info(img_data, is_horizontal)
+		return
+
+	var selected := tree.get_selected()
+	var meta = selected.get_metadata(0) if selected else null
+	if meta is Dictionary and meta.get("type") == "anim":
+		preview_container.current_index = clampi(meta.index, 0, preview_container.get_animation_count() - 1)
+
+	info_panel_manager.display_image_info(img_data, is_horizontal, preview_container.get_animation_count())
+	info_panel.add_child(preview_container)
+	info_panel.move_child(preview_container, 0)
 
 # ============================================================
 # ANIMATION SETTINGS CHANGED
@@ -240,14 +209,11 @@ func _add_animated_preview(img_data: Dictionary) -> void:
 
 func _on_animation_settings_changed(_value = null) -> void:
 	fps = int(fps_spinbox.value)
-	is_horizontal = direction_option.selected == 0
-
-	var selected := tree.get_selected()
-	if selected:
-		var metadata = selected.get_metadata(0)
-		if metadata is Dictionary and not metadata.has("type"):
-			info_panel_manager.display_image_info(metadata, 0 if is_horizontal else 1)
-			_add_animated_preview(metadata)
+	var horizontal := direction_option.selected == 0
+	if horizontal != is_horizontal:
+		is_horizontal = horizontal
+		tree_manager.set_direction(is_horizontal)
+	tree_manager.refresh_selection()
 
 # ============================================================
 # VALIDATION
@@ -262,21 +228,12 @@ func _get_selected_items() -> Array[Dictionary]:
 
 func _on_validate_pressed() -> void:
 	var selected_items := _get_selected_items()
-
-	if selected_items.is_empty():
-		status_label.text = "No images selected"
-		return
-
 	var animations := TiledImageExportUtils.build_animation_list(selected_items, is_horizontal)
 	naming_view_manager.show_naming_view(animations, fps, size.x)
-
-	export_anim_player_button.disabled = false
-	export_animated_sprite_button.disabled = false
+	animation_count_label.text = "%d animation(s) from %d sheet(s)" % [naming_view_manager.cells.size(), selected_items.size()]
 
 func _on_back_pressed() -> void:
 	naming_view_manager.show_scan_view()
-	export_anim_player_button.disabled = true
-	export_animated_sprite_button.disabled = true
 
 # ============================================================
 # EXPORT
@@ -285,17 +242,12 @@ func _on_back_pressed() -> void:
 func _prepare_export_data() -> Dictionary:
 	var scene_root = EditorInterface.get_edited_scene_root()
 	if not scene_root:
-		status_label.text = "Error: No scene is currently open"
+		push_warning("AnimSheet: open a scene to export into.")
 		return {}
 
-	var animation_mappings := naming_view_manager.get_animation_mappings()
 	var animations_data := naming_view_manager.get_animations_data()
 
 	var selected_items := _get_selected_items()
-
-	if selected_items.is_empty():
-		status_label.text = "No images selected"
-		return {}
 
 	var node_name: String = node_name_edit.text if node_name_edit.text != "" else "MergedAnimations"
 
@@ -303,40 +255,42 @@ func _prepare_export_data() -> Dictionary:
 		"scene_root": scene_root,
 		"selected_items": selected_items,
 		"node_name": node_name,
-		"animation_mappings": animation_mappings,
 		"animations_data": animations_data
 	}
 
-func _on_export_anim_player_pressed() -> void:
+func _get_export_parent(scene_root: Node) -> Node:
+	for node in EditorInterface.get_selection().get_selected_nodes():
+		if node == scene_root or scene_root.is_ancestor_of(node):
+			return node
+	return scene_root
+
+func _add_to_scene(node: Node, scene_root: Node) -> void:
+	var parent := _get_export_parent(scene_root)
+	var undo_redo := EditorInterface.get_editor_undo_redo()
+	undo_redo.create_action("AnimSheet: Export " + node.name, UndoRedo.MERGE_DISABLE, scene_root)
+	undo_redo.add_do_method(parent, "add_child", node, true)
+	for owned in [node] + node.get_children():
+		undo_redo.add_do_method(owned, "set_owner", scene_root)
+	undo_redo.add_do_reference(node)
+	undo_redo.add_undo_method(parent, "remove_child", node)
+	undo_redo.commit_action()
+
+func _on_export_pressed(as_animation_player: bool) -> void:
 	var export_data := _prepare_export_data()
 	if export_data.is_empty():
 		return
 
-	var anim_player := TiledImageExportUtils.export_to_animation_player(
-		export_data.selected_items, fps, export_data.scene_root,
-		export_data.node_name, export_data.animation_mappings, export_data.animations_data
-	)
-
-	if anim_player:
-		status_label.text = "Created merged AnimationPlayer with %d animation(s)" % anim_player.get_animation_list().size()
-		EditorInterface.edit_node(export_data.scene_root)
-		_on_back_pressed()
+	var kind := "AnimationPlayer" if as_animation_player else "AnimatedSprite2D"
+	var node: Node2D
+	if as_animation_player:
+		node = TiledImageExportUtils.export_to_animation_player(
+			export_data.selected_items, fps, export_data.node_name, export_data.animations_data)
 	else:
-		status_label.text = "Failed to create AnimationPlayer"
-
-func _on_export_animated_sprite_pressed() -> void:
-	var export_data := _prepare_export_data()
-	if export_data.is_empty():
+		node = TiledImageExportUtils.export_to_animated_sprite(
+			export_data.selected_items, fps, export_data.node_name, export_data.animations_data)
+	if not node:
+		push_error("AnimSheet: couldn't create the %s." % kind)
 		return
 
-	var animated_sprite := TiledImageExportUtils.export_to_animated_sprite(
-		export_data.selected_items, fps, export_data.scene_root,
-		export_data.node_name, export_data.animation_mappings, export_data.animations_data
-	)
-
-	if animated_sprite:
-		status_label.text = "Created merged AnimatedSprite2D with %d animation(s)" % animated_sprite.sprite_frames.get_animation_names().size()
-		EditorInterface.edit_node(export_data.scene_root)
-		_on_back_pressed()
-	else:
-		status_label.text = "Failed to create AnimatedSprite2D"
+	_add_to_scene(node, export_data.scene_root)
+	_on_back_pressed()

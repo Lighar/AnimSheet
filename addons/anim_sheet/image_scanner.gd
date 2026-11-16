@@ -2,21 +2,7 @@
 extends RefCounted
 class_name ImageScanner
 
-const GridDetectorUtils = preload("res://addons/anim_sheet/grid_detector_utils.gd")
-
-var extracted_path: String = ""
-
-func scan_folder(folder_path: String) -> Array[Dictionary]:
-	var images: Array[Dictionary] = []
-	var image_files := find_image_files(folder_path)
-	
-	for img_path in image_files:
-		var img_data := analyze_image(img_path)
-		if img_data.is_empty():
-			continue
-		images.append(img_data)
-	
-	return images
+const IMAGE_EXTENSIONS := ["png", "jpg", "jpeg", "bmp", "webp"]
 
 func analyze_image(img_path: String) -> Dictionary:
 	var img := Image.new()
@@ -39,7 +25,7 @@ func analyze_image(img_path: String) -> Dictionary:
 	if cell_height > 0:
 		rows = int(img.get_height() / cell_height)
 	
-	return {
+	var data := {
 		"path": img_path,
 		"filename": img_path.get_file(),
 		"width": img.get_width(),
@@ -52,6 +38,27 @@ func analyze_image(img_path: String) -> Dictionary:
 		"rows": rows,
 		"total_tiles": columns * rows
 	}
+
+	var content_rect := Rect2()
+	var animations := {}
+	var animation_hashes := {}
+	for horizontal in [true, false]:
+		animations[horizontal] = TiledImageExportUtils.extract_animation_frames(img, data, horizontal)
+		var hashes: Array = []
+		for frames in animations[horizontal]:
+			var bytes := PackedByteArray()
+			for r: Rect2 in frames:
+				var cell := img.get_region(Rect2i(r))
+				bytes.append_array(cell.get_data())
+				if horizontal:
+					var u := Rect2(cell.get_used_rect())
+					content_rect = content_rect.merge(u) if content_rect.has_area() else u
+			hashes.append(hash(bytes))
+		animation_hashes[horizontal] = hashes
+	data.animations = animations
+	data.animation_hashes = animation_hashes
+	data.content_rect = content_rect
+	return data
 
 func find_image_files(dir_path: String) -> Array[String]:
 	var result: Array[String] = []
@@ -70,7 +77,7 @@ func find_image_files(dir_path: String) -> Array[String]:
 				result.append_array(find_image_files(full_path))
 		else:
 			var ext := file_name.get_extension().to_lower()
-			if ext in ["png", "jpg", "jpeg", "bmp", "webp"]:
+			if ext in IMAGE_EXTENSIONS:
 				result.append(full_path)
 		
 		file_name = dir.get_next()
@@ -90,7 +97,7 @@ func extract_zip(zip_path: String, extract_to: String) -> bool:
 	for entry in files:
 		var file_path := entry.replace("\\", "/").simplify_path()
 		var ext := file_path.get_extension().to_lower()
-		if ext not in ["png", "jpg", "jpeg", "bmp", "webp"]:
+		if ext not in IMAGE_EXTENSIONS:
 			continue
 		if file_path.is_absolute_path() or file_path.begins_with(".."):
 			push_warning("AnimSheet: skipped unsafe zip entry: " + entry)

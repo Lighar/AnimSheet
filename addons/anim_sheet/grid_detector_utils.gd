@@ -18,7 +18,7 @@ static func get_prominence(arr: Array, peak_idx: int) -> float:
 		if arr[j] < rm: rm = arr[j]
 	return pv - maxf(lm, rm)
 
-static func get_base_spacing(projection: PackedInt32Array, label: String = "", min_size: int = 8) -> Variant:
+static func get_base_spacing(projection: PackedInt32Array, min_size: int = 8) -> Variant:
 	var n := projection.size()
 	if n == 0: return null
 
@@ -85,7 +85,7 @@ static func optimize_grid(projection: PackedInt32Array, approx: Variant, total: 
 	for t in valid_ts:
 		var folded: Array = []; folded.resize(t); folded.fill(0)
 		for idx in range(projection.size()): folded[idx % t] += projection[idx]
-		var vd: float = folded.min()
+		var vd: int = folded.min()
 		var vw := 0
 		for val in folded:
 			if val == vd: vw += 1
@@ -93,8 +93,7 @@ static func optimize_grid(projection: PackedInt32Array, approx: Variant, total: 
 		if score > best_score:
 			best_score = score
 			best_t = t
-			var found_offset = folded.find(vd)
-			best_off = found_offset if found_offset >= 0 else 0  # Ensure non-negative
+			best_off = folded.find(vd)
 	return [best_t, best_off]
 
 static func build_projections(img: Image) -> Array:
@@ -130,8 +129,8 @@ static func detect(img: Image) -> Dictionary:
 	var col_proj   : PackedInt32Array = projs[0]
 	var row_proj   : PackedInt32Array = projs[1]
 
-	var approx_w = get_base_spacing(col_proj, "col")
-	var approx_h = get_base_spacing(row_proj, "row")
+	var approx_w = get_base_spacing(col_proj)
+	var approx_h = get_base_spacing(row_proj)
 
 	var result_w := optimize_grid(col_proj, approx_w, img_width)
 	var result_h := optimize_grid(row_proj, approx_h, img_height)

@@ -9,50 +9,34 @@ extends VBoxContainer
 var texture: Texture2D
 var all_animations: Array[Array] = []
 var current_index: int = 0
-var timer: Timer = null
-var _pending_fps: int = 10
-var _setup_pending: bool = false
+var fps: int = 10
 
 func _ready() -> void:
 	prev_btn.pressed.connect(_on_prev_pressed)
 	next_btn.pressed.connect(_on_next_pressed)
-	
-	if _setup_pending:
-		_setup_pending = false
+	if not all_animations.is_empty():
 		_update_display()
-		_start_timer(_pending_fps)
 
-func setup(img_path: String, img_data: Dictionary, is_horizontal: bool, fps: int) -> bool:
+func setup(img_data: Dictionary, is_horizontal: bool, p_fps: int) -> bool:
 	var img := Image.new()
-	if img.load(img_path) != OK:
+	if img.load(img_data.path) != OK:
 		return false
-	
+
 	texture = ImageTexture.create_from_image(img)
-	all_animations.clear()
-	
-	var frames := TiledImageExportUtils.extract_animation_frames(img, img_data, is_horizontal)
-	for frame_array in frames:
-		var typed_array: Array[Rect2] = []
-		typed_array.assign(frame_array)
-		all_animations.append(typed_array)
-	
+	fps = p_fps
 	current_index = 0
-	_pending_fps = fps
-	
-	if is_inside_tree() and anim_label:
+	all_animations.clear()
+	for frame_array in img_data.animations[is_horizontal]:
+		all_animations.append(TiledImageExportUtils.crop_rects(frame_array, img_data.get("preview_rect", Rect2())))
+
+	if is_node_ready() and not all_animations.is_empty():
 		_update_display()
-		_start_timer(fps)
-	else:
-		_setup_pending = true
-	
-	return all_animations.size() > 0
+	return not all_animations.is_empty()
 
 func _update_display() -> void:
-	var count := all_animations.size()
-	anim_label.text = "Animation %d / %d" % [current_index + 1, count]
-	
-	if count > 0 and current_index < count:
-		preview.setup(texture, all_animations[current_index])
+	anim_label.text = "Animation %d / %d" % [current_index + 1, all_animations.size()]
+	preview.fps = fps
+	preview.setup(texture, all_animations[current_index])
 
 func _on_prev_pressed() -> void:
 	if current_index > 0:
@@ -63,27 +47,6 @@ func _on_next_pressed() -> void:
 	if current_index < all_animations.size() - 1:
 		current_index += 1
 		_update_display()
-
-func _start_timer(fps: int) -> void:
-	if timer:
-		timer.stop()
-		timer.queue_free()
-	
-	timer = Timer.new()
-	timer.wait_time = 1.0 / max(fps, 1)
-	timer.autostart = true
-	timer.timeout.connect(_on_timer_timeout)
-	add_child(timer)
-
-func _on_timer_timeout() -> void:
-	if is_instance_valid(preview):
-		preview.advance_frame()
-
-func _exit_tree() -> void:
-	if timer:
-		timer.stop()
-		timer.queue_free()
-		timer = null
 
 func get_animation_count() -> int:
 	return all_animations.size()
