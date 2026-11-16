@@ -38,15 +38,21 @@ theme_override_font_sizes/font_size = 24
 text = "AnimSheet"
 vertical_alignment = 1
 
-[node name="Spacer" type="Control" parent="BannerHBox" unique_id=160226600]
+[node name="StatusLabel" type="Label" parent="BannerHBox" unique_id=1608644831]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+text = "Select a folder or ZIP file to begin"
+horizontal_alignment = 2
+vertical_alignment = 1
+text_overrun_behavior = 3
 
 [node name="GithubButton" type="Button" parent="BannerHBox" unique_id=897452742]
 unique_name_in_owner = true
 layout_mode = 2
+tooltip_text = "View AnimSheet on GitHub"
 focus_mode = 0
-text = "View on Github"
 icon = ExtResource("3_github")
 
 [node name="GithubConfirmDialog" type="ConfirmationDialog" parent="." unique_id=1141938812]
@@ -75,60 +81,37 @@ size_flags_vertical = 0
 [node name="ButtonsContainer" type="HBoxContainer" parent="ScanView/ControlPanel" unique_id=546770553]
 layout_mode = 2
 
-[node name="SelectZipButton" type="Button" parent="ScanView/ControlPanel/ButtonsContainer" unique_id=656611059]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Select ZIP"
-
 [node name="SelectFolderButton" type="Button" parent="ScanView/ControlPanel/ButtonsContainer" unique_id=2141815274]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
 text = "Select Folder"
 
-[node name="AnimationSettings" type="VBoxContainer" parent="ScanView/ControlPanel" unique_id=1209651551]
-layout_mode = 2
-
-[node name="FPSContainer" type="HBoxContainer" parent="ScanView/ControlPanel/AnimationSettings" unique_id=311774704]
-layout_mode = 2
-
-[node name="FPSLabel" type="Label" parent="ScanView/ControlPanel/AnimationSettings/FPSContainer" unique_id=68223298]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Animation FPS:"
-
-[node name="FPSSpinBox" type="SpinBox" parent="ScanView/ControlPanel/AnimationSettings/FPSContainer" unique_id=1450392688]
+[node name="SelectZipButton" type="Button" parent="ScanView/ControlPanel/ButtonsContainer" unique_id=656611059]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
+text = "Select ZIP"
+
+[node name="VSeparator" type="VSeparator" parent="ScanView/ControlPanel/ButtonsContainer"]
+layout_mode = 2
+
+[node name="FPSLabel" type="Label" parent="ScanView/ControlPanel/ButtonsContainer" unique_id=68223298]
+layout_mode = 2
+text = "FPS"
+
+[node name="FPSSpinBox" type="SpinBox" parent="ScanView/ControlPanel/ButtonsContainer" unique_id=1450392688]
+unique_name_in_owner = true
+layout_mode = 2
 min_value = 1.0
 max_value = 60.0
 value = 10.0
 
-[node name="DirectionContainer" type="HBoxContainer" parent="ScanView/ControlPanel/AnimationSettings" unique_id=1603283840]
+[node name="DirectionLabel" type="Label" parent="ScanView/ControlPanel/ButtonsContainer" unique_id=520352033]
 layout_mode = 2
+text = "Direction"
 
-[node name="DirectionLabel" type="Label" parent="ScanView/ControlPanel/AnimationSettings/DirectionContainer" unique_id=520352033]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Direction:"
-
-[node name="DirectionOption" type="OptionButton" parent="ScanView/ControlPanel/AnimationSettings/DirectionContainer" unique_id=1218284644]
+[node name="DirectionOption" type="OptionButton" parent="ScanView/ControlPanel/ButtonsContainer" unique_id=1218284644]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
-selected = 0
-item_count = 2
-popup/item_0/text = "Horizontal (Row-based)"
-popup/item_0/id = 0
-popup/item_1/text = "Vertical (Column-based)"
-popup/item_1/id = 1
-
-[node name="StatusLabel" type="Label" parent="ScanView/ControlPanel" unique_id=1608644831]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Select a ZIP file to begin"
 
 [node name="HSeparator2" type="HSeparator" parent="ScanView/ControlPanel" unique_id=2129899103]
 layout_mode = 2
@@ -141,6 +124,25 @@ size_flags_vertical = 3
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 1.5
+
+[node name="SelectionBar" type="HBoxContainer" parent="ScanView/HSplitContainer/LeftPanel"]
+layout_mode = 2
+
+[node name="SelectAllButton" type="Button" parent="ScanView/HSplitContainer/LeftPanel/SelectionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "All"
+
+[node name="SelectNoneButton" type="Button" parent="ScanView/HSplitContainer/LeftPanel/SelectionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "None"
+
+[node name="SelectionLabel" type="Label" parent="ScanView/HSplitContainer/LeftPanel/SelectionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 2
 
 [node name="Tree" type="Tree" parent="ScanView/HSplitContainer/LeftPanel" unique_id=2008326294]
 unique_name_in_owner = true
@@ -188,24 +190,28 @@ offset_top = 60.0
 offset_right = -10.0
 offset_bottom = -10.0
 
-[node name="TopPanel" type="VBoxContainer" parent="NamingView" unique_id=1000375408]
+[node name="TopPanel" type="HBoxContainer" parent="NamingView" unique_id=1000375408]
 layout_mode = 2
 
 [node name="NodeNameLabel" type="Label" parent="NamingView/TopPanel" unique_id=1013815822]
 layout_mode = 2
-text = "Exported Name:"
+text = "Node name"
 
 [node name="NodeNameEdit" type="LineEdit" parent="NamingView/TopPanel" unique_id=1574706431]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(240, 0)
 layout_mode = 2
 placeholder_text = "ExportedAnimationNode"
 
-[node name="HSeparator" type="HSeparator" parent="NamingView/TopPanel" unique_id=945433896]
+[node name="AnimationCountLabel" type="Label" parent="NamingView/TopPanel"]
+unique_name_in_owner = true
 layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+horizontal_alignment = 2
 
-[node name="AnimationsLabel" type="Label" parent="NamingView/TopPanel" unique_id=1474739543]
+[node name="HSeparator" type="HSeparator" parent="NamingView" unique_id=945433896]
 layout_mode = 2
-text = "Animation Names:"
 
 [node name="ScrollContainer" type="ScrollContainer" parent="NamingView" unique_id=1896303971]
 layout_mode = 2
@@ -215,30 +221,29 @@ size_flags_vertical = 3
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 12
 
-[node name="BottomPanel" type="VBoxContainer" parent="NamingView" unique_id=1662694295]
+[node name="HSeparator2" type="HSeparator" parent="NamingView" unique_id=1756493676]
 layout_mode = 2
 
-[node name="HSeparator" type="HSeparator" parent="NamingView/BottomPanel" unique_id=1756493676]
+[node name="ButtonsContainer" type="HBoxContainer" parent="NamingView" unique_id=555036339]
 layout_mode = 2
 
-[node name="ButtonsContainer" type="HBoxContainer" parent="NamingView/BottomPanel" unique_id=555036339]
-layout_mode = 2
-
-[node name="BackButton" type="Button" parent="NamingView/BottomPanel/ButtonsContainer" unique_id=873071299]
+[node name="BackButton" type="Button" parent="NamingView/ButtonsContainer" unique_id=873071299]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Back"
 
-[node name="ExportAnimPlayerButton" type="Button" parent="NamingView/BottomPanel/ButtonsContainer" unique_id=1916737896]
+[node name="ExportAnimPlayerButton" type="Button" parent="NamingView/ButtonsContainer" unique_id=1916737896]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 disabled = true
 text = "To AnimationPlayer"
 
-[node name="ExportAnimatedSpriteButton" type="Button" parent="NamingView/BottomPanel/ButtonsContainer" unique_id=1826258084]
+[node name="ExportAnimatedSpriteButton" type="Button" parent="NamingView/ButtonsContainer" unique_id=1826258084]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3

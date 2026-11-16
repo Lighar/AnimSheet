@@ -3,11 +3,12 @@ extends RefCounted
 class_name TreeManager
 
 signal item_selected(metadata: Dictionary, is_folder: bool)
-signal item_edited(affected_paths: Array, is_checked: bool)
+signal selection_changed
 
 var tree: Tree
 var tree_items: Dictionary = {}
 var folder_items: Dictionary = {}
+var is_horizontal := true
 
 func _init(tree_control: Tree):
 	tree = tree_control
@@ -21,6 +22,8 @@ func _on_item_selected() -> void:
 		return
 	
 	var metadata = selected.get_metadata(0)
+	if metadata is Dictionary and metadata.get("type") == "anim":
+		metadata = selected.get_parent().get_metadata(0)
 	if metadata is Dictionary:
 		var is_folder: bool = metadata.has("type") and metadata.type == "folder"
 		item_selected.emit(metadata, is_folder)
@@ -29,20 +32,43 @@ func _on_item_edited() -> void:
 	var edited := tree.get_edited()
 	if not edited:
 		return
-	
-	var metadata = edited.get_metadata(0)
-	var is_checked := edited.is_checked(1)
-	var affected_paths: Array = []
-	
-	if metadata is Dictionary and metadata.has("type") and metadata.type == "folder":
-		set_children_checked(edited, is_checked)
-		affected_paths = _collect_image_paths_from_folder(edited)
-	else:
-		if metadata is Dictionary and metadata.has("path"):
-			affected_paths.append(metadata.path)
-		update_parent_folder_state(edited)
-	
-	item_edited.emit(affected_paths, is_checked)
+
+	edited.propagate_check(1, false)
+	selection_changed.emit()
+
+func set_all_checked(checked: bool) -> void:
+	var root := tree.get_root()
+	var item := root.get_first_child() if root else null
+	while item:
+		item.set_checked(1, checked)
+		item.propagate_check(1, false)
+		item = item.get_next()
+	selection_changed.emit()
+
+func is_sheet_selected(path: String) -> bool:
+	var item: TreeItem = tree_items.get(path)
+	return item != null and (item.is_checked(1) or item.is_indeterminate(1))
+
+func checked_animations(path: String) -> Array:
+	var result: Array = []
+	var item: TreeItem = tree_items.get(path)
+	if item:
+		for child in item.get_children():
+			if child.is_checked(1):
+				result.append(child.get_metadata(0).index)
+	return result
+
+func set_direction(horizontal: bool) -> void:
+	is_horizontal = horizontal
+	for item: TreeItem in tree_items.values():
+		var selected := item.is_checked(1) or item.is_indeterminate(1)
+		for child in item.get_children():
+			child.free()
+		item.set_indeterminate(1, false)
+		item.set_checked(1, selected)
+		_add_animation_items(item, item.get_metadata(0))
+		item.propagate_check(1, false)
+	selection_changed.emit()
 
 func setup() -> void:
 	tree.clear()
@@ -56,7 +82,8 @@ func setup() -> void:
 	tree.create_item()
 	tree.hide_root = true
 
-func populate(images: Array[Dictionary], base_path: String) -> void:
+func populate(images: Array[Dictionary], base_path: String, horizontal: bool) -> void:
+	is_horizontal = horizontal
 	tree.clear()
 	tree_items.clear()
 	folder_items.clear()
@@ -145,9 +172,26 @@ func _create_image_tree_item(parent: TreeItem, img_data: Dictionary) -> TreeItem
 	item.set_cell_mode(1, TreeItem.CELL_MODE_CHECK)
 	item.set_editable(1, true)
 	item.set_checked(1, false)
+	_add_animation_items(item, img_data)
 	
 	tree_items[img_data.path] = item
 	return item
+
+func _add_animation_items(sheet_item: TreeItem, img_data: Dictionary) -> void:
+	var count: int = img_data.get("animation_hashes", {}).get(is_horizontal, []).size()
+	if count < 2:
+		return
+	var color := tree.get_theme_color("warning_color", "Editor") if tree.has_theme_color("warning_color", "Editor") else Color(1.0, 0.75, 0.3)
+	for i in count:
+		var child := tree.create_item(sheet_item)
+		child.set_text(0, TiledImageExportUtils.animation_name(img_data, i, count, is_horizontal))
+		child.set_icon(0, tree.get_theme_icon("Animation", "EditorIcons"))
+		child.set_custom_color(0, color)
+		child.set_metadata(0, {"type": "anim", "path": img_data.path, "index": i})
+		child.set_cell_mode(1, TreeItem.CELL_MODE_CHECK)
+		child.set_editable(1, true)
+		child.set_checked(1, sheet_item.is_checked(1))
+	sheet_item.collapsed = true
 
 func _get_relative_path(full_path: String, base_path: String) -> String:
 	if base_path.is_empty():
@@ -161,39 +205,42 @@ func _get_relative_path(full_path: String, base_path: String) -> String:
 	
 	return full_path.get_file()
 
-func set_children_checked(folder_item: TreeItem, checked: bool) -> void:
-	var child := folder_item.get_first_child()
-	while child:
-		child.set_checked(1, checked)
-		
-		var child_metadata = child.get_metadata(0)
-		if child_metadata is Dictionary:
-			if child_metadata.has("type") and child_metadata.type == "folder":
-				set_children_checked(child, checked)
-		
-		child = child.get_next()
+func update_duplicate_warnings(images: Array[Dictionary]) -> void:
+	var checked_by_hash := {}
+	for img_data in images:
+		var sheet: TreeItem = tree_items.get(img_data.path)
+		if sheet == null:
+			continue
+		var hashes: Array = img_data.get("animation_hashes", {}).get(is_horizontal, [])
+		for i in hashes.size():
+			var anim_item := sheet if sheet.get_child_count() == 0 else sheet.get_child(i)
+			if anim_item.is_checked(1):
+				checked_by_hash.get_or_add(hashes[i], []).append(anim_item)
 
-func update_parent_folder_state(item: TreeItem) -> void:
-	var parent := item.get_parent()
-	if not parent or parent == tree.get_root():
-		return
-	
-	var parent_metadata = parent.get_metadata(0)
-	if not parent_metadata is Dictionary or not parent_metadata.has("type"):
-		return
-	if parent_metadata.type != "folder":
-		return
-	
-	var child := parent.get_first_child()
-	var all_checked := true
-	
-	while child:
-		if not child.is_checked(1):
-			all_checked = false
-		child = child.get_next()
-	
-	parent.set_checked(1, all_checked)
-	update_parent_folder_state(parent)
+	for sheet: TreeItem in tree_items.values():
+		_clear_warning(sheet)
+		for child in sheet.get_children():
+			_clear_warning(child)
+
+	var icon := tree.get_theme_icon("StatusWarning", "EditorIcons")
+	for items: Array in checked_by_hash.values():
+		if items.size() < 2:
+			continue
+		for item: TreeItem in items:
+			var others: Array = items.filter(func(o): return o != item).map(_label)
+			item.add_button(0, icon, -1, false, "Same frames as checked:\n%s\nExporting both duplicates this animation." % "\n".join(others))
+			var parent := item.get_parent()
+			if parent.get_metadata(0).get("type") != "folder" and parent.get_button_count(0) == 0:
+				parent.add_button(0, icon, -1, false, "Some checked animations duplicate other checked animations.")
+
+func _clear_warning(item: TreeItem) -> void:
+	if item.get_button_count(0) > 0:
+		item.erase_button(0, 0)
+
+func _label(item: TreeItem) -> String:
+	var meta: Dictionary = item.get_metadata(0)
+	var sheet_label := TiledImageExportUtils.short_path(meta.path)
+	return sheet_label + " › " + item.get_text(0) if meta.get("type") == "anim" else sheet_label
 
 func count_images_in_folder(folder_path: String) -> int:
 	var folder_item = folder_items.get(folder_path)

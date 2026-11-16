@@ -32,9 +32,7 @@ func setup(img_path: String, img_data: Dictionary, is_horizontal: bool, fps: int
 	
 	var frames := TiledImageExportUtils.extract_animation_frames(img, img_data, is_horizontal)
 	for frame_array in frames:
-		var typed_array: Array[Rect2] = []
-		typed_array.assign(frame_array)
-		all_animations.append(typed_array)
+		all_animations.append(TiledImageExportUtils.crop_rects(frame_array, img_data.get("preview_rect", Rect2())))
 	
 	current_index = 0
 	_pending_fps = fps

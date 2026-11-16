@@ -37,12 +37,55 @@ static func extract_animation_frames(img: Image, img_data: Dictionary, is_horizo
 
 	return all_animations
 
+static func strip_common_prefix(animations: Array[Dictionary]) -> void:
+	if animations.size() < 2:
+		return
+	var prefix: String = animations[0].display_name
+	for anim in animations:
+		while not anim.display_name.begins_with(prefix):
+			prefix = prefix.left(-1)
+	var cut := -1
+	for sep in ["-", "_", " ", "."]:
+		cut = max(cut, prefix.rfind(sep))
+	if cut < 0:
+		return
+	for anim in animations:
+		var rest: String = anim.display_name.substr(cut + 1)
+		if rest.is_empty() or rest[0].is_valid_int():
+			return
+	for anim in animations:
+		anim.display_name = anim.display_name.substr(cut + 1)
+
+static func share_preview_rects(images: Array[Dictionary]) -> void:
+	var by_cell := {}
+	for img_data in images:
+		var key := Vector2i(img_data.cell_width, img_data.cell_height)
+		var u: Rect2 = img_data.get("content_rect", Rect2())
+		if u.has_area():
+			var cur: Rect2 = by_cell.get(key, Rect2())
+			by_cell[key] = cur.merge(u) if cur.has_area() else u
+	for img_data in images:
+		img_data.preview_rect = by_cell.get(Vector2i(img_data.cell_width, img_data.cell_height), Rect2())
+
+static func crop_rects(rects: Array, used: Rect2) -> Array[Rect2]:
+	var cropped: Array[Rect2] = []
+	for r: Rect2 in rects:
+		cropped.append(Rect2(r.position + used.position, used.size) if used.has_area() else r)
+	return cropped
+
+static func short_path(path: String) -> String:
+	return path.get_base_dir().get_file().path_join(path.get_file())
+
+static func animation_name(img_data: Dictionary, index: int, count: int, is_horizontal: bool) -> String:
+	var base_name: String = img_data.filename.get_basename()
+	if count == 1:
+		return base_name
+	return base_name + ("_row_%d" if is_horizontal else "_col_%d") % index
+
 static func build_animation_list(selected_items: Array, is_horizontal: bool) -> Array[Dictionary]:
 	var animations: Array[Dictionary] = []
 
 	for img_data in selected_items:
-		var base_name: String = img_data.filename.get_basename()
-
 		var img := Image.new()
 		if img.load(img_data.path) != OK:
 			push_warning("AnimSheet: skipped unreadable image: " + str(img_data.path))
@@ -51,11 +94,13 @@ static func build_animation_list(selected_items: Array, is_horizontal: bool) -> 
 		var all_frame_rects := extract_animation_frames(img, img_data, is_horizontal)
 		var anim_count := all_frame_rects.size()
 
+		var only: Array = img_data.get("anim_selection", [])
 		for i in range(anim_count):
+			if not only.is_empty() and not only.has(i):
+				continue
 			var frame_rects: Array[Rect2] = []
 			frame_rects.assign(all_frame_rects[i])
-			var suffix := "_row_%d" if is_horizontal else "_col_%d"
-			var anim_name := base_name if anim_count == 1 else base_name + suffix % i
+			var anim_name := animation_name(img_data, i, anim_count, is_horizontal)
 			animations.append({
 				"original_name": anim_name,
 				"display_name": anim_name,
@@ -65,6 +110,7 @@ static func build_animation_list(selected_items: Array, is_horizontal: bool) -> 
 				"frame_rects": frame_rects
 			})
 
+	strip_common_prefix(animations)
 	return animations
 
 static func _merge_images_into_sheet(selected_items: Array) -> Dictionary:
@@ -131,7 +177,7 @@ static func _merge_images_into_sheet(selected_items: Array) -> Dictionary:
 		"image_infos": image_infos
 	}
 
-static func export_to_animation_player(selected_items: Array, fps: int, scene_root: Node, node_name: String, animation_mappings: Dictionary, animations_data: Array = []) -> AnimationPlayer:
+static func export_to_animation_player(selected_items: Array, fps: int, node_name: String, animation_mappings: Dictionary, animations_data: Array = []) -> AnimationPlayer:
 	var merged_data := _merge_images_into_sheet(selected_items)
 	if merged_data.is_empty():
 		return null
@@ -150,21 +196,19 @@ static func export_to_animation_player(selected_items: Array, fps: int, scene_ro
 	var anim_player = AnimationPlayer.new()
 	anim_player.name = "AnimationPlayer"
 	
-	scene_root.add_child(sprite)
-	sprite.owner = scene_root
 	sprite.add_child(anim_player)
-	anim_player.owner = scene_root
 	
 	var anim_library = AnimationLibrary.new()
-	var frame_duration := 1.0 / float(fps) if fps > 0 else 0.1
 	
 	if animations_data.size() > 0:
 		for anim_data in animations_data:
 			if not anim_data.has("frame_rects") or anim_data.frame_rects.is_empty():
 				continue
 			
+			var anim_fps: int = anim_data.get("fps", fps)
+			var frame_duration := 1.0 / float(anim_fps) if anim_fps > 0 else 0.1
 			var anim = Animation.new()
-			anim.loop_mode = Animation.LOOP_LINEAR
+			anim.loop_mode = Animation.LOOP_LINEAR if anim_data.get("loop", true) else Animation.LOOP_NONE
 			
 			var track_idx := anim.add_track(Animation.TYPE_VALUE)
 			anim.track_set_path(track_idx, NodePath(".:frame_coords"))
@@ -196,7 +240,7 @@ static func export_to_animation_player(selected_items: Array, fps: int, scene_ro
 	
 	return anim_player
 
-static func export_to_animated_sprite(selected_items: Array, fps: int, scene_root: Node, node_name: String, animation_mappings: Dictionary, animations_data: Array = []) -> AnimatedSprite2D:
+static func export_to_animated_sprite(selected_items: Array, fps: int, node_name: String, animation_mappings: Dictionary, animations_data: Array = []) -> AnimatedSprite2D:
 	var merged_data := _merge_images_into_sheet(selected_items)
 	if merged_data.is_empty():
 		return null
@@ -221,8 +265,8 @@ static func export_to_animated_sprite(selected_items: Array, fps: int, scene_roo
 			var anim_name: String = anim_data.original_name
 			var custom_name: String = animation_mappings.get(anim_name, anim_name)
 			sprite_frames.add_animation(custom_name)
-			sprite_frames.set_animation_speed(custom_name, fps)
-			sprite_frames.set_animation_loop(custom_name, true)
+			sprite_frames.set_animation_speed(custom_name, anim_data.get("fps", fps))
+			sprite_frames.set_animation_loop(custom_name, anim_data.get("loop", true))
 			
 			var img_data: Dictionary = anim_data.img_data
 			var start_row: int = 0
@@ -250,8 +294,5 @@ static func export_to_animated_sprite(selected_items: Array, fps: int, scene_roo
 	var anim_names = sprite_frames.get_animation_names()
 	if not anim_names.is_empty():
 		animated_sprite.animation = anim_names[0]
-	
-	scene_root.add_child(animated_sprite)
-	animated_sprite.owner = scene_root
-	
+
 	return animated_sprite

@@ -39,7 +39,7 @@ func analyze_image(img_path: String) -> Dictionary:
 	if cell_height > 0:
 		rows = int(img.get_height() / cell_height)
 	
-	return {
+	var data := {
 		"path": img_path,
 		"filename": img_path.get_file(),
 		"width": img.get_width(),
@@ -52,6 +52,24 @@ func analyze_image(img_path: String) -> Dictionary:
 		"rows": rows,
 		"total_tiles": columns * rows
 	}
+
+	var content_rect := Rect2()
+	var animation_hashes := {}
+	for horizontal in [true, false]:
+		var hashes: Array = []
+		for frames in TiledImageExportUtils.extract_animation_frames(img, data, horizontal):
+			var bytes := PackedByteArray()
+			for r: Rect2 in frames:
+				var cell := img.get_region(Rect2i(r))
+				bytes.append_array(cell.get_data())
+				if horizontal:
+					var u := Rect2(cell.get_used_rect())
+					content_rect = content_rect.merge(u) if content_rect.has_area() else u
+			hashes.append(hash(bytes))
+		animation_hashes[horizontal] = hashes
+	data.animation_hashes = animation_hashes
+	data.content_rect = content_rect
+	return data
 
 func find_image_files(dir_path: String) -> Array[String]:
 	var result: Array[String] = []
