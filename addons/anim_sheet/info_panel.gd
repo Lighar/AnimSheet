@@ -26,7 +26,7 @@ func display_folder_info(folder_path: String, image_count: int) -> void:
 	add_item("Images", str(image_count), "Image", Color(0.8, 1.0, 0.8))
 	add_spacer()
 
-func display_image_info(img_data: Dictionary, direction: int, actual_anim_count: int = -1) -> void:
+func display_image_info(img_data: Dictionary, is_horizontal: bool, anim_count: int = -1) -> void:
 	clear()
 	
 	add_header("SpriteSheet Info", "Image")
@@ -44,11 +44,8 @@ func display_image_info(img_data: Dictionary, direction: int, actual_anim_count:
 	add_spacer()
 	
 	add_header("Animations", "AnimationPlayer")
-	var is_horizontal := direction == 0
-	
-	if actual_anim_count > 0:
-		var direction_text := "row" if is_horizontal else "column"
-		add_item("Count", "%d %s(s)" % [actual_anim_count, direction_text], "Animation", Color(1.0, 0.7, 0.9))
+	if anim_count > 0:
+		add_item("Count", "%d %s(s)" % [anim_count, "row" if is_horizontal else "column"], "Animation", Color(1.0, 0.7, 0.9))
 
 func add_header(text: String, icon_name: String) -> void:
 	var header = InfoHeaderScene.instantiate()

@@ -27,7 +27,6 @@ extends Control
 @onready var github_confirm_dialog: ConfirmationDialog = %GithubConfirmDialog
 
 # -- Source --
-var current_zip_path: String = ""
 var extracted_path: String = ""
 
 # -- Scan results --
@@ -71,28 +70,15 @@ func _ready() -> void:
 	export_anim_player_button.icon = get_theme_icon("AnimationPlayer", "EditorIcons")
 	export_animated_sprite_button.icon = get_theme_icon("AnimatedSprite2D", "EditorIcons")
 
-	validate_button.disabled = true
-	export_anim_player_button.disabled = true
-	export_animated_sprite_button.disabled = true
-
-	scan_view.visible = true
-	naming_view.visible = false
-
-	fps_spinbox.min_value = 1
-	fps_spinbox.max_value = 60
-	fps_spinbox.value = fps
-	fps_spinbox.step = 1
 	fps_spinbox.value_changed.connect(_on_animation_settings_changed)
 
 	direction_option.clear()
 	direction_option.add_item("Horizontal (Row-based)", 0)
 	direction_option.add_item("Vertical (Column-based)", 1)
-	direction_option.selected = 0 if is_horizontal else 1
 	direction_option.item_selected.connect(_on_animation_settings_changed)
 
 	tree_manager.setup()
-	_update_export_buttons_state()
-	_show_info_placeholder()
+	info_panel_manager.show_placeholder()
 
 func _exit_tree() -> void:
 	ImageScanner.clear_temp_dirs()
@@ -129,10 +115,9 @@ func _on_select_folder_pressed() -> void:
 	file_dialog.popup_centered_ratio(0.6)
 
 func _on_zip_selected(path: String) -> void:
-	current_zip_path = path
 	status_label.text = "Selected: " + path.get_file() + " - Scanning..."
 	await get_tree().process_frame
-	_extract_and_scan()
+	_extract_and_scan(path)
 
 func _on_folder_selected(path: String) -> void:
 	extracted_path = path
@@ -144,10 +129,10 @@ func _on_folder_selected(path: String) -> void:
 # SCANNING
 # ============================================================
 
-func _extract_and_scan() -> void:
+func _extract_and_scan(zip_path: String) -> void:
 	extracted_path = ImageScanner.make_temp_dir()
 
-	if not image_scanner.extract_zip(current_zip_path, extracted_path):
+	if not image_scanner.extract_zip(zip_path, extracted_path):
 		status_label.text = "Error: Failed to open ZIP file"
 		ImageScanner.remove_dir_recursive(extracted_path)
 		return
@@ -171,19 +156,16 @@ func _scan_images() -> void:
 			await get_tree().process_frame
 		WorkerThreadPool.wait_for_group_task_completion(group_id)
 
-	var tiled_count := 0
 	for result: Dictionary in results:
 		if not result.is_empty():
-			result["selected"] = false
 			scanned_images.append(result)
-			tiled_count += 1
 
 	TiledImageExportUtils.share_preview_rects(scanned_images)
 	tree_manager.populate(scanned_images, extracted_path, is_horizontal)
 
 	_update_export_buttons_state()
-	if tiled_count > 0:
-		status_label.text = "Found %d tiled images out of %d total" % [tiled_count, image_files.size()]
+	if not scanned_images.is_empty():
+		status_label.text = "Found %d tiled images out of %d total" % [scanned_images.size(), image_files.size()]
 	else:
 		status_label.text = "No tiled images found"
 
@@ -207,9 +189,6 @@ func _update_export_buttons_state() -> void:
 # INFO PANEL & PREVIEW
 # ============================================================
 
-func _show_info_placeholder() -> void:
-	info_panel_manager.show_placeholder()
-
 func _update_info_panel(metadata: Dictionary, is_folder: bool) -> void:
 	if metadata.is_empty():
 		info_panel_manager.clear()
@@ -219,30 +198,23 @@ func _update_info_panel(metadata: Dictionary, is_folder: bool) -> void:
 		var image_count := tree_manager.count_images_in_folder(folder_path)
 		info_panel_manager.display_folder_info(folder_path, image_count)
 	else:
-		info_panel_manager.display_image_info(metadata, 0 if is_horizontal else 1)
-		_add_animated_preview(metadata)
+		_show_image_info(metadata)
 
-func _add_animated_preview(img_data: Dictionary) -> void:
-
-	var preview_scene := preload("res://addons/anim_sheet/components/animation_preview_container.tscn")
-	var preview_container = preview_scene.instantiate()
-
-	if preview_container.setup(img_data, is_horizontal, fps):
-		var selected := tree.get_selected()
-		var meta = selected.get_metadata(0) if selected else null
-		if meta is Dictionary and meta.get("type") == "anim":
-			preview_container.current_index = clampi(meta.index, 0, preview_container.get_animation_count() - 1)
-
-		# Get actual animation count from the preview
-		var actual_count = preview_container.get_animation_count()
-		
-		# Update info panel with correct count
-		info_panel_manager.display_image_info(img_data, 0 if is_horizontal else 1, actual_count)
-		
-		info_panel.add_child(preview_container)
-		info_panel.move_child(preview_container, 0)
-	else:
+func _show_image_info(img_data: Dictionary) -> void:
+	var preview_container = preload("res://addons/anim_sheet/components/animation_preview_container.tscn").instantiate()
+	if not preview_container.setup(img_data, is_horizontal, fps):
 		preview_container.queue_free()
+		info_panel_manager.display_image_info(img_data, is_horizontal)
+		return
+
+	var selected := tree.get_selected()
+	var meta = selected.get_metadata(0) if selected else null
+	if meta is Dictionary and meta.get("type") == "anim":
+		preview_container.current_index = clampi(meta.index, 0, preview_container.get_animation_count() - 1)
+
+	info_panel_manager.display_image_info(img_data, is_horizontal, preview_container.get_animation_count())
+	info_panel.add_child(preview_container)
+	info_panel.move_child(preview_container, 0)
 
 # ============================================================
 # ANIMATION SETTINGS CHANGED
@@ -278,13 +250,8 @@ func _on_validate_pressed() -> void:
 	naming_view_manager.show_naming_view(animations, fps, size.x)
 	animation_count_label.text = "%d animation(s) from %d sheet(s)" % [naming_view_manager.cells.size(), selected_items.size()]
 
-	export_anim_player_button.disabled = false
-	export_animated_sprite_button.disabled = false
-
 func _on_back_pressed() -> void:
 	naming_view_manager.show_scan_view()
-	export_anim_player_button.disabled = true
-	export_animated_sprite_button.disabled = true
 
 # ============================================================
 # EXPORT

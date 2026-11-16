@@ -139,6 +139,7 @@ layout_mode = 2
 text = "None"
 
 [node name="SelectionLabel" type="Label" parent="ScanView/HSplitContainer/LeftPanel/SelectionBar"]
+text = "0 / 0 selected"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -240,12 +241,10 @@ text = "Back"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-disabled = true
 text = "To AnimationPlayer"
 
 [node name="ExportAnimatedSpriteButton" type="Button" parent="NamingView/ButtonsContainer" unique_id=1826258084]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-disabled = true
 text = "To AnimatedSprite2D"

@@ -8,7 +8,6 @@ var scan_view: Control
 var naming_view: Control
 var node_name_edit: LineEdit
 var animations_grid: GridContainer
-var fps: int
 
 var cells: Array = []
 
@@ -18,9 +17,7 @@ func _init(p_scan_view: Control, p_naming_view: Control, p_node_name_edit: LineE
 	node_name_edit = p_node_name_edit
 	animations_grid = p_animations_grid
 
-func show_naming_view(animations: Array[Dictionary], p_fps: int, window_width: float) -> void:
-	fps = p_fps
-	
+func show_naming_view(animations: Array[Dictionary], fps: int, window_width: float) -> void:
 	scan_view.visible = false
 	naming_view.visible = true
 	
@@ -34,8 +31,6 @@ func show_naming_view(animations: Array[Dictionary], p_fps: int, window_width: f
 	
 	var textures := {}
 	for anim in animations:
-		if not anim.has("frame_rects") or anim.frame_rects.size() == 0:
-			continue
 		var path: String = anim.img_data.path
 		if not textures.has(path):
 			var img := Image.new()

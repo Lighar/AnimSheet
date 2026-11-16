@@ -2,18 +2,11 @@
 class_name TiledImageExportUtils
 
 static func _is_frame_empty(img: Image, x: int, y: int, width: int, height: int) -> bool:
-	var has_visible_pixel := false
-	
-	for py in range(y, min(y + height, img.get_height())):
-		for px in range(x, min(x + width, img.get_width())):
-			var pixel := img.get_pixel(px, py)
-			if pixel.a > 0.01:  # Has some alpha
-				has_visible_pixel = true
-				break
-		if has_visible_pixel:
-			break
-	
-	return not has_visible_pixel
+	for py in range(y, y + height):
+		for px in range(x, x + width):
+			if img.get_pixel(px, py).a > 0.01:
+				return false
+	return true
 
 static func extract_animation_frames(img: Image, img_data: Dictionary, is_horizontal: bool) -> Array[Array]:
 	var all_animations: Array[Array] = []

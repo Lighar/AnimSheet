@@ -25,8 +25,7 @@ func _on_item_selected() -> void:
 	if metadata is Dictionary and metadata.get("type") == "anim":
 		metadata = selected.get_parent().get_metadata(0)
 	if metadata is Dictionary:
-		var is_folder: bool = metadata.has("type") and metadata.type == "folder"
-		item_selected.emit(metadata, is_folder)
+		item_selected.emit(metadata, metadata.get("type") == "folder")
 
 func _on_item_edited() -> void:
 	var edited := tree.get_edited()
@@ -100,8 +99,7 @@ func _build_folder_structure(images: Array[Dictionary], base_path: String) -> Di
 	var structure := {}
 	
 	for img_data in images:
-		var relative_path := _get_relative_path(img_data["path"], base_path)
-		var folder_path := relative_path.get_base_dir()
+		var folder_path: String = img_data.path.trim_prefix(base_path).trim_prefix("/").get_base_dir()
 		
 		if folder_path == "":
 			folder_path = "."
@@ -187,18 +185,6 @@ func _create_checkable_item(parent: TreeItem, text: String, icon_name: String, m
 	item.set_editable(1, true)
 	return item
 
-func _get_relative_path(full_path: String, base_path: String) -> String:
-	if base_path.is_empty():
-		return full_path.get_file()
-	
-	if full_path.begins_with(base_path):
-		var relative := full_path.substr(base_path.length())
-		if relative.begins_with("/"):
-			relative = relative.substr(1)
-		return relative
-	
-	return full_path.get_file()
-
 func update_duplicate_warnings(images: Array[Dictionary]) -> void:
 	var checked_by_hash := {}
 	for img_data in images:
@@ -237,25 +223,11 @@ func _label(item: TreeItem) -> String:
 	return sheet_label + " › " + item.get_text(0) if meta.get("type") == "anim" else sheet_label
 
 func count_images_in_folder(folder_path: String) -> int:
-	var folder_item = folder_items.get(folder_path)
-	if not folder_item:
-		return 0
-	return _collect_image_paths_from_folder(folder_item).size()
+	var folder_item: TreeItem = folder_items.get(folder_path)
+	return _count_images(folder_item) if folder_item else 0
 
-func _collect_image_paths_from_folder(folder_item: TreeItem) -> Array:
-	var paths: Array = []
-	var child := folder_item.get_first_child()
-	
-	while child:
-		var child_metadata = child.get_metadata(0)
-		if child_metadata is Dictionary:
-			if child_metadata.has("type") and child_metadata.type == "folder":
-				# Recursively collect from subfolders
-				paths.append_array(_collect_image_paths_from_folder(child))
-			elif child_metadata.has("path"):
-				# It's an image file
-				paths.append(child_metadata.path)
-		
-		child = child.get_next()
-	
-	return paths
+func _count_images(folder_item: TreeItem) -> int:
+	var count := 0
+	for child in folder_item.get_children():
+		count += _count_images(child) if child.get_metadata(0).get("type") == "folder" else 1
+	return count
