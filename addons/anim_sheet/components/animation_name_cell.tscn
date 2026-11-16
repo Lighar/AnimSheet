@@ -3,14 +3,41 @@
 [ext_resource type="Script" path="res://addons/anim_sheet/components/animation_name_cell.gd" id="1_cell"]
 [ext_resource type="PackedScene" path="res://addons/anim_sheet/components/animated_preview.tscn" id="2_preview"]
 
-[node name="AnimationNameCell" type="VBoxContainer"]
-custom_minimum_size = Vector2(200, 250)
+[node name="AnimationNameCell" type="PanelContainer"]
 script = ExtResource("1_cell")
 
-[node name="AnimatedPreview" parent="." instance=ExtResource("2_preview")]
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="AnimatedPreview" parent="VBox" instance=ExtResource("2_preview")]
+unique_name_in_owner = true
 custom_minimum_size = Vector2(200, 200)
 layout_mode = 2
 
-[node name="NameInput" type="LineEdit" parent="."]
+[node name="NameInput" type="LineEdit" parent="VBox"]
+unique_name_in_owner = true
 layout_mode = 2
 placeholder_text = "Animation name"
+
+[node name="Options" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+
+[node name="LoopCheck" type="CheckBox" parent="VBox/Options"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Loop this animation"
+button_pressed = true
+text = "Loop"
+
+[node name="FPSLabel" type="Label" parent="VBox/Options"]
+layout_mode = 2
+text = "FPS"
+
+[node name="FPSSpin" type="SpinBox" parent="VBox/Options"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Frames per second for this animation"
+min_value = 1.0
+max_value = 60.0
+value = 10.0
