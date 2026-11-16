@@ -1,52 +1,36 @@
 @tool
 extends Control
 
-var texture_rect: TextureRect
+const NON_LOOP_PAUSE := 0.7
 
-var sprite_texture: Texture2D
+@onready var texture_rect: TextureRect = $TextureRect
+
+var fps := 10.0
+var loop := true
 var frames: Array[Rect2] = []
-var current_frame: int = 0
+var current_frame := 0
+var _atlas := AtlasTexture.new()
+var _elapsed := 0.0
 
-func _ready():
-	texture_rect = $TextureRect
-	
-	# If setup was called before _ready, apply the settings now
-	if sprite_texture and not frames.is_empty():
-		_apply_setup()
+func _ready() -> void:
+	texture_rect.texture = _atlas
 
-func setup(texture: Texture2D, frame_rects: Array[Rect2]):
-	sprite_texture = texture
+func setup(texture: Texture2D, frame_rects: Array[Rect2]) -> void:
+	_atlas.atlas = texture
 	frames = frame_rects
 	current_frame = 0
-	
+	_elapsed = 0.0
+	if not frames.is_empty():
+		_atlas.region = frames[0]
+
+func _process(delta: float) -> void:
 	if frames.is_empty():
 		return
-	
-	# If node is ready, apply immediately, otherwise wait for _ready()
-	if texture_rect:
-		_apply_setup()
-
-func _apply_setup():
-	if frames.is_empty() or not sprite_texture or not texture_rect:
-		return
-	
-	_update_frame()
-
-func advance_frame():
-	if frames.is_empty():
-		return
-	
-	current_frame = (current_frame + 1) % frames.size()
-	_update_frame()
-
-func _update_frame():
-	if frames.is_empty() or not sprite_texture or not texture_rect:
-		return
-	
-	var frame_rect = frames[current_frame]
-	
-	var atlas := AtlasTexture.new()
-	atlas.atlas = sprite_texture
-	atlas.region = frame_rect
-	
-	texture_rect.texture = atlas
+	var step := 1.0 / maxf(fps, 1.0)
+	if not loop and current_frame == frames.size() - 1:
+		step += NON_LOOP_PAUSE
+	_elapsed += delta
+	if _elapsed >= step:
+		_elapsed = fmod(_elapsed, step)
+		current_frame = (current_frame + 1) % frames.size()
+		_atlas.region = frames[current_frame]

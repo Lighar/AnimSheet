@@ -149,13 +149,8 @@ func _create_folder_tree_item(parent: TreeItem, folder_path: String, structure: 
 	if parent_path != "" and structure.has(parent_path):
 		actual_parent = _create_folder_tree_item(parent, parent_path, structure)
 	
-	var folder_item := tree.create_item(actual_parent)
-	folder_item.set_text(0, folder_data.get("name", folder_path.get_file()))
-	folder_item.set_icon(0, tree.get_theme_icon("Folder", "EditorIcons"))
-	folder_item.set_metadata(0, {"type": "folder", "path": folder_path})
-	folder_item.set_cell_mode(1, TreeItem.CELL_MODE_CHECK)
-	folder_item.set_editable(1, true)
-	folder_item.set_checked(1, false)
+	var folder_item := _create_checkable_item(actual_parent, folder_data.get("name", folder_path.get_file()),
+			"Folder", {"type": "folder", "path": folder_path})
 	
 	folder_items[folder_path] = folder_item
 	
@@ -165,13 +160,7 @@ func _create_folder_tree_item(parent: TreeItem, folder_path: String, structure: 
 	return folder_item
 
 func _create_image_tree_item(parent: TreeItem, img_data: Dictionary) -> TreeItem:
-	var item := tree.create_item(parent)
-	item.set_text(0, img_data.filename)
-	item.set_icon(0, tree.get_theme_icon("Image", "EditorIcons"))
-	item.set_metadata(0, img_data)
-	item.set_cell_mode(1, TreeItem.CELL_MODE_CHECK)
-	item.set_editable(1, true)
-	item.set_checked(1, false)
+	var item := _create_checkable_item(parent, img_data.filename, "Image", img_data)
 	_add_animation_items(item, img_data)
 	
 	tree_items[img_data.path] = item
@@ -183,15 +172,20 @@ func _add_animation_items(sheet_item: TreeItem, img_data: Dictionary) -> void:
 		return
 	var color := tree.get_theme_color("warning_color", "Editor") if tree.has_theme_color("warning_color", "Editor") else Color(1.0, 0.75, 0.3)
 	for i in count:
-		var child := tree.create_item(sheet_item)
-		child.set_text(0, TiledImageExportUtils.animation_name(img_data, i, count, is_horizontal))
-		child.set_icon(0, tree.get_theme_icon("Animation", "EditorIcons"))
+		var child := _create_checkable_item(sheet_item, TiledImageExportUtils.animation_name(img_data, i, count, is_horizontal),
+				"Animation", {"type": "anim", "path": img_data.path, "index": i})
 		child.set_custom_color(0, color)
-		child.set_metadata(0, {"type": "anim", "path": img_data.path, "index": i})
-		child.set_cell_mode(1, TreeItem.CELL_MODE_CHECK)
-		child.set_editable(1, true)
 		child.set_checked(1, sheet_item.is_checked(1))
 	sheet_item.collapsed = true
+
+func _create_checkable_item(parent: TreeItem, text: String, icon_name: String, metadata: Dictionary) -> TreeItem:
+	var item := tree.create_item(parent)
+	item.set_text(0, text)
+	item.set_icon(0, tree.get_theme_icon(icon_name, "EditorIcons"))
+	item.set_metadata(0, metadata)
+	item.set_cell_mode(1, TreeItem.CELL_MODE_CHECK)
+	item.set_editable(1, true)
+	return item
 
 func _get_relative_path(full_path: String, base_path: String) -> String:
 	if base_path.is_empty():

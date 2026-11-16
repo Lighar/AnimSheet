@@ -227,7 +227,7 @@ func _add_animated_preview(img_data: Dictionary) -> void:
 	var preview_scene := preload("res://addons/anim_sheet/components/animation_preview_container.tscn")
 	var preview_container = preview_scene.instantiate()
 
-	if preview_container.setup(img_data.path, img_data, is_horizontal, fps):
+	if preview_container.setup(img_data, is_horizontal, fps):
 		var selected := tree.get_selected()
 		var meta = selected.get_metadata(0) if selected else null
 		if meta is Dictionary and meta.get("type") == "anim":
