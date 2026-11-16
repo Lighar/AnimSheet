@@ -62,8 +62,8 @@ func _ready() -> void:
 	select_all_button.pressed.connect(tree_manager.set_all_checked.bind(true))
 	select_none_button.pressed.connect(tree_manager.set_all_checked.bind(false))
 	back_button.pressed.connect(_on_back_pressed)
-	export_anim_player_button.pressed.connect(_on_export_anim_player_pressed)
-	export_animated_sprite_button.pressed.connect(_on_export_animated_sprite_pressed)
+	export_anim_player_button.pressed.connect(_on_export_pressed.bind(true))
+	export_animated_sprite_button.pressed.connect(_on_export_pressed.bind(false))
 	github_button.pressed.connect(_on_github_button_pressed)
 	github_confirm_dialog.confirmed.connect(_on_github_confirm)
 
@@ -276,7 +276,7 @@ func _on_validate_pressed() -> void:
 
 	var animations := TiledImageExportUtils.build_animation_list(selected_items, is_horizontal)
 	naming_view_manager.show_naming_view(animations, fps, size.x)
-	animation_count_label.text = "%d animation(s) from %d sheet(s)" % [naming_view_manager.animation_previews.size(), selected_items.size()]
+	animation_count_label.text = "%d animation(s) from %d sheet(s)" % [naming_view_manager.cells.size(), selected_items.size()]
 
 	export_anim_player_button.disabled = false
 	export_animated_sprite_button.disabled = false
@@ -296,7 +296,6 @@ func _prepare_export_data() -> Dictionary:
 		status_label.text = "Error: No scene is currently open"
 		return {}
 
-	var animation_mappings := naming_view_manager.get_animation_mappings()
 	var animations_data := naming_view_manager.get_animations_data()
 
 	var selected_items := _get_selected_items()
@@ -311,7 +310,6 @@ func _prepare_export_data() -> Dictionary:
 		"scene_root": scene_root,
 		"selected_items": selected_items,
 		"node_name": node_name,
-		"animation_mappings": animation_mappings,
 		"animations_data": animations_data
 	}
 
@@ -333,36 +331,23 @@ func _add_to_scene(node: Node, scene_root: Node) -> Node:
 	undo_redo.commit_action()
 	return parent
 
-func _on_export_anim_player_pressed() -> void:
+func _on_export_pressed(as_animation_player: bool) -> void:
 	var export_data := _prepare_export_data()
 	if export_data.is_empty():
 		return
 
-	var anim_player := TiledImageExportUtils.export_to_animation_player(
-		export_data.selected_items, fps,
-		export_data.node_name, export_data.animation_mappings, export_data.animations_data
-	)
-
-	if anim_player:
-		var parent := _add_to_scene(anim_player.get_parent(), export_data.scene_root)
-		status_label.text = "Created AnimationPlayer with %d animation(s) under %s" % [anim_player.get_animation_list().size(), parent.name]
-		_on_back_pressed()
+	var kind := "AnimationPlayer" if as_animation_player else "AnimatedSprite2D"
+	var node: Node2D
+	if as_animation_player:
+		node = TiledImageExportUtils.export_to_animation_player(
+			export_data.selected_items, fps, export_data.node_name, export_data.animations_data)
 	else:
-		status_label.text = "Failed to create AnimationPlayer"
-
-func _on_export_animated_sprite_pressed() -> void:
-	var export_data := _prepare_export_data()
-	if export_data.is_empty():
+		node = TiledImageExportUtils.export_to_animated_sprite(
+			export_data.selected_items, fps, export_data.node_name, export_data.animations_data)
+	if not node:
+		status_label.text = "Failed to create " + kind
 		return
 
-	var animated_sprite := TiledImageExportUtils.export_to_animated_sprite(
-		export_data.selected_items, fps,
-		export_data.node_name, export_data.animation_mappings, export_data.animations_data
-	)
-
-	if animated_sprite:
-		var parent := _add_to_scene(animated_sprite, export_data.scene_root)
-		status_label.text = "Created AnimatedSprite2D with %d animation(s) under %s" % [animated_sprite.sprite_frames.get_animation_names().size(), parent.name]
-		_on_back_pressed()
-	else:
-		status_label.text = "Failed to create AnimatedSprite2D"
+	var parent := _add_to_scene(node, export_data.scene_root)
+	status_label.text = "Created %s with %d animation(s) under %s" % [kind, export_data.animations_data.size(), parent.name]
+	_on_back_pressed()

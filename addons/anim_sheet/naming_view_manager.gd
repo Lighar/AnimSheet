@@ -10,8 +10,7 @@ var node_name_edit: LineEdit
 var animations_grid: GridContainer
 var fps: int
 
-var animation_name_inputs: Dictionary = {}
-var animation_previews: Array = []
+var cells: Array = []
 
 func _init(p_scan_view: Control, p_naming_view: Control, p_node_name_edit: LineEdit, p_animations_grid: GridContainer):
 	scan_view = p_scan_view
@@ -29,8 +28,7 @@ func show_naming_view(animations: Array[Dictionary], p_fps: int, window_width: f
 	
 	for child in animations_grid.get_children():
 		child.queue_free()
-	animation_name_inputs.clear()
-	animation_previews.clear()
+	cells.clear()
 	
 	animations_grid.columns = max(1, int(window_width / 224))
 	
@@ -51,23 +49,15 @@ func show_naming_view(animations: Array[Dictionary], p_fps: int, window_width: f
 
 		animations_grid.add_child(cell)
 		cell.setup(texture, frame_rects, anim.display_name, anim, fps)
-		animation_previews.append(cell)
-		animation_name_inputs[anim.original_name] = cell
+		cells.append(cell)
 
 func show_scan_view() -> void:
 	scan_view.visible = true
 	naming_view.visible = false
 
-func get_animation_mappings() -> Dictionary:
-	var mappings: Dictionary = {}
-	for orig_name in animation_name_inputs:
-		var cell = animation_name_inputs[orig_name]
-		mappings[orig_name] = cell.get_custom_name()
-	return mappings
-
 func get_animations_data() -> Array[Dictionary]:
 	var data: Array[Dictionary] = []
-	for orig_name in animation_name_inputs:
-		var cell = animation_name_inputs[orig_name]
+	for cell in cells:
 		data.append(cell.get_anim_data())
+	TiledImageExportUtils.make_names_unique(data, "name")
 	return data

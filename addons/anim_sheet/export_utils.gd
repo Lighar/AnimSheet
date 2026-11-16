@@ -82,16 +82,23 @@ static func animation_name(img_data: Dictionary, index: int, count: int, is_hori
 		return base_name
 	return base_name + ("_row_%d" if is_horizontal else "_col_%d") % index
 
+static func make_names_unique(animations: Array, key: String) -> void:
+	var used := {}
+	for anim in animations:
+		var base: String = anim[key]
+		var unique := base
+		var n := 1
+		while used.has(unique):
+			n += 1
+			unique = "%s_%d" % [base, n]
+		used[unique] = true
+		anim[key] = unique
+
 static func build_animation_list(selected_items: Array, is_horizontal: bool) -> Array[Dictionary]:
 	var animations: Array[Dictionary] = []
 
 	for img_data in selected_items:
-		var img := Image.new()
-		if img.load(img_data.path) != OK:
-			push_warning("AnimSheet: skipped unreadable image: " + str(img_data.path))
-			continue
-
-		var all_frame_rects := extract_animation_frames(img, img_data, is_horizontal)
+		var all_frame_rects: Array = img_data.animations[is_horizontal]
 		var anim_count := all_frame_rects.size()
 
 		var only: Array = img_data.get("anim_selection", [])
@@ -100,17 +107,14 @@ static func build_animation_list(selected_items: Array, is_horizontal: bool) -> 
 				continue
 			var frame_rects: Array[Rect2] = []
 			frame_rects.assign(all_frame_rects[i])
-			var anim_name := animation_name(img_data, i, anim_count, is_horizontal)
 			animations.append({
-				"original_name": anim_name,
-				"display_name": anim_name,
+				"display_name": animation_name(img_data, i, anim_count, is_horizontal),
 				"img_data": img_data,
-				"row": i if is_horizontal else -1,
-				"col": -1 if is_horizontal else i,
 				"frame_rects": frame_rects
 			})
 
 	strip_common_prefix(animations)
+	make_names_unique(animations, "display_name")
 	return animations
 
 static func _merge_images_into_sheet(selected_items: Array) -> Dictionary:
@@ -120,34 +124,25 @@ static func _merge_images_into_sheet(selected_items: Array) -> Dictionary:
 	var max_cell_width := 0
 	var max_cell_height := 0
 	var total_rows := 0
+	var columns := 0
 	var image_infos: Array[Dictionary] = []
-	
+	var start_rows := {}
+
 	for img_data in selected_items:
 		var img := Image.new()
 		if img.load(img_data.path) != OK:
 			push_warning("AnimSheet: skipped unreadable image: " + str(img_data.path))
 			continue
-		
+
 		max_cell_width = max(max_cell_width, img_data.cell_width)
 		max_cell_height = max(max_cell_height, img_data.cell_height)
-		
-		var info := {
-			"image": img,
-			"data": img_data,
-			"start_row": total_rows
-		}
-		image_infos.append(info)
-		
-		if img_data.has("rows"):
-			total_rows += img_data.rows
-	
+		columns = max(columns, img_data.columns)
+		image_infos.append({"image": img, "data": img_data, "start_row": total_rows})
+		start_rows[img_data.path] = total_rows
+		total_rows += img_data.rows
+
 	if image_infos.is_empty():
 		return {}
-	
-	# Widest sheet choosed
-	var columns := 0
-	for info in image_infos:
-		columns = max(columns, info.data.columns)
 
 	var merged_width := max_cell_width * columns
 	var merged_height := max_cell_height * total_rows
@@ -168,130 +163,91 @@ static func _merge_images_into_sheet(selected_items: Array) -> Dictionary:
 				
 				merged_img.blit_rect(img, Rect2i(src_x, src_y, img_data.cell_width, img_data.cell_height), Vector2i(dst_x, dst_y))
 	
+	var texture := ImageTexture.create_from_image(merged_img)
+	if not texture:
+		return {}
+
 	return {
-		"image": merged_img,
+		"texture": texture,
 		"cell_width": max_cell_width,
 		"cell_height": max_cell_height,
 		"columns": columns,
 		"rows": total_rows,
-		"image_infos": image_infos
+		"start_rows": start_rows
 	}
 
-static func export_to_animation_player(selected_items: Array, fps: int, node_name: String, animation_mappings: Dictionary, animations_data: Array = []) -> AnimationPlayer:
-	var merged_data := _merge_images_into_sheet(selected_items)
-	if merged_data.is_empty():
-		return null
-	
-	var texture := ImageTexture.create_from_image(merged_data.image)
-	if not texture:
-		return null
-	
-	var sprite = Sprite2D.new()
-	sprite.name = node_name
-	sprite.texture = texture
-	sprite.hframes = merged_data.columns
-	sprite.vframes = merged_data.rows
-	sprite.frame_coords = Vector2i.ZERO
-	
-	var anim_player = AnimationPlayer.new()
-	anim_player.name = "AnimationPlayer"
-	
-	sprite.add_child(anim_player)
-	
-	var anim_library = AnimationLibrary.new()
-	
-	if animations_data.size() > 0:
-		for anim_data in animations_data:
-			if not anim_data.has("frame_rects") or anim_data.frame_rects.is_empty():
-				continue
-			
-			var anim_fps: int = anim_data.get("fps", fps)
-			var frame_duration := 1.0 / float(anim_fps) if anim_fps > 0 else 0.1
-			var anim = Animation.new()
-			anim.loop_mode = Animation.LOOP_LINEAR if anim_data.get("loop", true) else Animation.LOOP_NONE
-			
-			var track_idx := anim.add_track(Animation.TYPE_VALUE)
-			anim.track_set_path(track_idx, NodePath(".:frame_coords"))
-			anim.value_track_set_update_mode(track_idx, Animation.UPDATE_DISCRETE)
-			
-			var frame_time := 0.0
-			var img_data: Dictionary = anim_data.img_data
-			var start_row: int = 0
-			
-			for info in merged_data.image_infos:
-				if info.data == img_data:
-					start_row = info.start_row
-					break
-			
-			for frame_rect in anim_data.frame_rects:
-				
-				var col: int = int((frame_rect.position.x - img_data.offset_x) / img_data.cell_width)
-				var row: int = int((frame_rect.position.y - img_data.offset_y) / img_data.cell_height)
-				
-				anim.track_insert_key(track_idx, frame_time, Vector2i(col, start_row + row))
-				frame_time += frame_duration
-			
-			if frame_time > 0:
-				anim.length = frame_time
-				var anim_name: String = anim_data.original_name
-				var custom_name: String = animation_mappings.get(anim_name, anim_name)
-				anim_library.add_animation(custom_name, anim)
-	anim_player.add_animation_library("", anim_library)
-	
-	return anim_player
+static func _frame_coords(anim_data: Dictionary, merged: Dictionary) -> Array[Vector2i]:
+	var img_data: Dictionary = anim_data.img_data
+	var start_row: int = merged.start_rows.get(img_data.path, 0)
+	var coords: Array[Vector2i] = []
+	for r: Rect2 in anim_data.frame_rects:
+		var col := int((r.position.x - img_data.offset_x) / img_data.cell_width)
+		var row := int((r.position.y - img_data.offset_y) / img_data.cell_height)
+		coords.append(Vector2i(col, start_row + row))
+	return coords
 
-static func export_to_animated_sprite(selected_items: Array, fps: int, node_name: String, animation_mappings: Dictionary, animations_data: Array = []) -> AnimatedSprite2D:
-	var merged_data := _merge_images_into_sheet(selected_items)
-	if merged_data.is_empty():
+static func export_to_animation_player(selected_items: Array, fps: int, node_name: String, animations_data: Array) -> Sprite2D:
+	var merged := _merge_images_into_sheet(selected_items)
+	if merged.is_empty():
 		return null
-	
-	var texture := ImageTexture.create_from_image(merged_data.image)
-	if not texture:
+
+	var sprite := Sprite2D.new()
+	sprite.name = node_name
+	sprite.texture = merged.texture
+	sprite.hframes = merged.columns
+	sprite.vframes = merged.rows
+
+	var anim_player := AnimationPlayer.new()
+	anim_player.name = "AnimationPlayer"
+	sprite.add_child(anim_player)
+
+	var anim_library := AnimationLibrary.new()
+	for anim_data in animations_data:
+		var coords := _frame_coords(anim_data, merged)
+		if coords.is_empty():
+			continue
+		var anim_fps: int = anim_data.get("fps", fps)
+		var frame_duration := 1.0 / anim_fps if anim_fps > 0 else 0.1
+
+		var anim := Animation.new()
+		anim.loop_mode = Animation.LOOP_LINEAR if anim_data.get("loop", true) else Animation.LOOP_NONE
+		var track_idx := anim.add_track(Animation.TYPE_VALUE)
+		anim.track_set_path(track_idx, NodePath(".:frame_coords"))
+		anim.value_track_set_update_mode(track_idx, Animation.UPDATE_DISCRETE)
+		for i in coords.size():
+			anim.track_insert_key(track_idx, i * frame_duration, coords[i])
+		anim.length = coords.size() * frame_duration
+		anim_library.add_animation(anim_data.name, anim)
+	anim_player.add_animation_library("", anim_library)
+
+	return sprite
+
+static func export_to_animated_sprite(selected_items: Array, fps: int, node_name: String, animations_data: Array) -> AnimatedSprite2D:
+	var merged := _merge_images_into_sheet(selected_items)
+	if merged.is_empty():
 		return null
-	
-	var animated_sprite = AnimatedSprite2D.new()
+
+	var cw: int = merged.cell_width
+	var ch: int = merged.cell_height
+	var sprite_frames := SpriteFrames.new()
+	for anim_data in animations_data:
+		var coords := _frame_coords(anim_data, merged)
+		if coords.is_empty():
+			continue
+		var anim_name: String = anim_data.name
+		sprite_frames.add_animation(anim_name)
+		sprite_frames.set_animation_speed(anim_name, anim_data.get("fps", fps))
+		sprite_frames.set_animation_loop(anim_name, anim_data.get("loop", true))
+		for c in coords:
+			var atlas_texture := AtlasTexture.new()
+			atlas_texture.atlas = merged.texture
+			atlas_texture.region = Rect2(c.x * cw, c.y * ch, cw, ch)
+			sprite_frames.add_frame(anim_name, atlas_texture)
+
+	var animated_sprite := AnimatedSprite2D.new()
 	animated_sprite.name = node_name
-	
-	var sprite_frames = SpriteFrames.new()
-	
-	var cell_width: int = merged_data.cell_width
-	var cell_height: int = merged_data.cell_height
-	
-	if animations_data.size() > 0:
-		for anim_data in animations_data:
-			if not anim_data.has("frame_rects") or anim_data.frame_rects.is_empty():
-				continue
-			
-			var anim_name: String = anim_data.original_name
-			var custom_name: String = animation_mappings.get(anim_name, anim_name)
-			sprite_frames.add_animation(custom_name)
-			sprite_frames.set_animation_speed(custom_name, anim_data.get("fps", fps))
-			sprite_frames.set_animation_loop(custom_name, anim_data.get("loop", true))
-			
-			var img_data: Dictionary = anim_data.img_data
-			var start_row: int = 0
-			
-			for info in merged_data.image_infos:
-				if info.data == img_data:
-					start_row = info.start_row
-					break
-			
-			for frame_rect in anim_data.frame_rects:
-				
-				var col: int = int((frame_rect.position.x - img_data.offset_x) / img_data.cell_width)
-				var row: int = int((frame_rect.position.y - img_data.offset_y) / img_data.cell_height)
-				
-				var frame_x: int = col * cell_width
-				var frame_y: int = (start_row + row) * cell_height
-				
-				var atlas_texture = AtlasTexture.new()
-				atlas_texture.atlas = texture
-				atlas_texture.region = Rect2(frame_x, frame_y, cell_width, cell_height)
-				sprite_frames.add_frame(custom_name, atlas_texture)
-	
 	animated_sprite.sprite_frames = sprite_frames
-	
-	var anim_names = sprite_frames.get_animation_names()
+	var anim_names := sprite_frames.get_animation_names()
 	if not anim_names.is_empty():
 		animated_sprite.animation = anim_names[0]
 

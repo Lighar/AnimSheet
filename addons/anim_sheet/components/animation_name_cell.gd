@@ -36,10 +36,9 @@ func advance_frame() -> void:
 		_hold_until = 0
 	preview.advance_frame()
 
-func get_custom_name() -> String:
-	return name_input.text
-
 func get_anim_data() -> Dictionary:
+	var typed := name_input.text.strip_edges()
+	anim_data.name = typed if not typed.is_empty() else anim_data.display_name
 	anim_data.loop = loop_check.button_pressed
 	anim_data.fps = int(fps_spin.value)
 	return anim_data

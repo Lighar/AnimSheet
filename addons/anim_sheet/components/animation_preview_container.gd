@@ -30,8 +30,7 @@ func setup(img_path: String, img_data: Dictionary, is_horizontal: bool, fps: int
 	texture = ImageTexture.create_from_image(img)
 	all_animations.clear()
 	
-	var frames := TiledImageExportUtils.extract_animation_frames(img, img_data, is_horizontal)
-	for frame_array in frames:
+	for frame_array in img_data.animations[is_horizontal]:
 		all_animations.append(TiledImageExportUtils.crop_rects(frame_array, img_data.get("preview_rect", Rect2())))
 	
 	current_index = 0
