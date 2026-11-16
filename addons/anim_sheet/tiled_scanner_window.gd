@@ -6,7 +6,6 @@ extends Control
 @onready var select_folder_button: Button = %SelectFolderButton
 @onready var tree: Tree = %Tree
 @onready var info_panel: VBoxContainer = %InfoPanel
-@onready var status_label: Label = %StatusLabel
 @onready var fps_spinbox: SpinBox = %FPSSpinBox
 @onready var direction_option: OptionButton = %DirectionOption
 @onready var validate_button: Button = %ValidateButton
@@ -102,7 +101,7 @@ func _on_select_zip_pressed() -> void:
 	file_dialog.file_mode = EditorFileDialog.FILE_MODE_OPEN_FILE
 	file_dialog.access = EditorFileDialog.ACCESS_FILESYSTEM
 	file_dialog.add_filter("*.zip", "ZIP Archives")
-	file_dialog.file_selected.connect(_on_zip_selected)
+	file_dialog.file_selected.connect(_extract_and_scan)
 	add_child(file_dialog)
 	file_dialog.popup_centered_ratio(0.6)
 
@@ -114,15 +113,8 @@ func _on_select_folder_pressed() -> void:
 	add_child(file_dialog)
 	file_dialog.popup_centered_ratio(0.6)
 
-func _on_zip_selected(path: String) -> void:
-	status_label.text = "Selected: " + path.get_file() + " - Scanning..."
-	await get_tree().process_frame
-	_extract_and_scan(path)
-
 func _on_folder_selected(path: String) -> void:
 	extracted_path = path
-	status_label.text = "Selected folder: " + path.get_file() + " - Scanning..."
-	await get_tree().process_frame
 	_scan_images()
 
 # ============================================================
@@ -133,7 +125,7 @@ func _extract_and_scan(zip_path: String) -> void:
 	extracted_path = ImageScanner.make_temp_dir()
 
 	if not image_scanner.extract_zip(zip_path, extracted_path):
-		status_label.text = "Error: Failed to open ZIP file"
+		push_error("AnimSheet: couldn't open %s, or it has no images." % zip_path)
 		ImageScanner.remove_dir_recursive(extracted_path)
 		return
 
@@ -143,9 +135,6 @@ func _extract_and_scan(zip_path: String) -> void:
 func _scan_images() -> void:
 	scanned_images.clear()
 	var image_files := image_scanner.find_image_files(extracted_path)
-
-	status_label.text = "Found %d images, analyzing..." % image_files.size()
-	await get_tree().process_frame
 
 	var results: Array = []
 	results.resize(image_files.size())
@@ -164,10 +153,8 @@ func _scan_images() -> void:
 	tree_manager.populate(scanned_images, extracted_path, is_horizontal)
 
 	_update_export_buttons_state()
-	if not scanned_images.is_empty():
-		status_label.text = "Found %d tiled images out of %d total" % [scanned_images.size(), image_files.size()]
-	else:
-		status_label.text = "No tiled images found"
+	if scanned_images.is_empty():
+		push_warning("AnimSheet: no sprite sheets found in %d image(s)." % image_files.size())
 
 # ============================================================
 # SELECTION & STATE SYNC
@@ -241,11 +228,6 @@ func _get_selected_items() -> Array[Dictionary]:
 
 func _on_validate_pressed() -> void:
 	var selected_items := _get_selected_items()
-
-	if selected_items.is_empty():
-		status_label.text = "No images selected"
-		return
-
 	var animations := TiledImageExportUtils.build_animation_list(selected_items, is_horizontal)
 	naming_view_manager.show_naming_view(animations, fps, size.x)
 	animation_count_label.text = "%d animation(s) from %d sheet(s)" % [naming_view_manager.cells.size(), selected_items.size()]
@@ -260,16 +242,12 @@ func _on_back_pressed() -> void:
 func _prepare_export_data() -> Dictionary:
 	var scene_root = EditorInterface.get_edited_scene_root()
 	if not scene_root:
-		status_label.text = "Error: No scene is currently open"
+		push_warning("AnimSheet: open a scene to export into.")
 		return {}
 
 	var animations_data := naming_view_manager.get_animations_data()
 
 	var selected_items := _get_selected_items()
-
-	if selected_items.is_empty():
-		status_label.text = "No images selected"
-		return {}
 
 	var node_name: String = node_name_edit.text if node_name_edit.text != "" else "MergedAnimations"
 
@@ -286,7 +264,7 @@ func _get_export_parent(scene_root: Node) -> Node:
 			return node
 	return scene_root
 
-func _add_to_scene(node: Node, scene_root: Node) -> Node:
+func _add_to_scene(node: Node, scene_root: Node) -> void:
 	var parent := _get_export_parent(scene_root)
 	var undo_redo := EditorInterface.get_editor_undo_redo()
 	undo_redo.create_action("AnimSheet: Export " + node.name, UndoRedo.MERGE_DISABLE, scene_root)
@@ -296,7 +274,6 @@ func _add_to_scene(node: Node, scene_root: Node) -> Node:
 	undo_redo.add_do_reference(node)
 	undo_redo.add_undo_method(parent, "remove_child", node)
 	undo_redo.commit_action()
-	return parent
 
 func _on_export_pressed(as_animation_player: bool) -> void:
 	var export_data := _prepare_export_data()
@@ -312,9 +289,8 @@ func _on_export_pressed(as_animation_player: bool) -> void:
 		node = TiledImageExportUtils.export_to_animated_sprite(
 			export_data.selected_items, fps, export_data.node_name, export_data.animations_data)
 	if not node:
-		status_label.text = "Failed to create " + kind
+		push_error("AnimSheet: couldn't create the %s." % kind)
 		return
 
-	var parent := _add_to_scene(node, export_data.scene_root)
-	status_label.text = "Created %s with %d animation(s) under %s" % [kind, export_data.animations_data.size(), parent.name]
+	_add_to_scene(node, export_data.scene_root)
 	_on_back_pressed()

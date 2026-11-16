@@ -34,19 +34,10 @@ stretch_mode = 5
 
 [node name="TitleLabel" type="Label" parent="BannerHBox" unique_id=2082416106]
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 24
 text = "AnimSheet"
 vertical_alignment = 1
-
-[node name="StatusLabel" type="Label" parent="BannerHBox" unique_id=1608644831]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
-text = "Select a folder or ZIP file to begin"
-horizontal_alignment = 2
-vertical_alignment = 1
-text_overrun_behavior = 3
 
 [node name="GithubButton" type="Button" parent="BannerHBox" unique_id=897452742]
 unique_name_in_owner = true
